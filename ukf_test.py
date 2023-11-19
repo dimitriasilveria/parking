@@ -15,7 +15,7 @@ from numpy.linalg import inv
 from scipy.linalg import block_diag
 from mobotpy.integration import rk_four
 from mobotpy.models import DiffDrive, Articulated
-
+from icecream import ic
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 30.0
 T = 0.04
@@ -46,7 +46,7 @@ vehicle = Articulated(ell_W_r, ell_T_r, ell_W_f, ell_T_f)
 # BUILD A MAP OF FEATURES IN THE VEHICLE'S ENVIRONMENT
 
 # Number of features
-M = 10
+M = 1
 
 # Map size [m]
 D_MAP = 30
@@ -138,7 +138,6 @@ def transmitter_sensor(x, transm, R, alpha, beta):
         # Range measurement [m]
         r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
         y[i] = alpha*np.exp(-beta*r) + np.sqrt(R[0, 0]) * np.random.randn(1)
-        print('y',y)
 
     # Return the range and bearing to features in y with indices in a
     return y
@@ -207,7 +206,6 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
     w_x = 0.5 / (n_x + kappa) * np.ones(2 * n_x + 1)
     w_x[0] = 2 * kappa * w_x[0]
     y_hat = np.average(y_hat_sig, axis=1, weights=w_x)
-    print('y_hat',y_hat)
     P_y = np.zeros((m_k,m_k))
     P_xy = np.zeros((n_x, m_k))
     for i in range(0, 2 * n_x + 1):
@@ -303,7 +301,32 @@ for i in range(1, N):
         beta
     )
 
-# %%
+#function to check observability during the whole trajetory
+def check_observability(x, u,x_m):
+    n = np.shape(x)[0]
+    m = np.shape(x_m)[1]
+    H = np.zeros((m,n))
+    F = np.zeros((n,n))
+    for i in range(N):
+        for j in range(m):
+            di = np.sqrt((x_m[0,j]-x[0,i])**2 +(x_m[1,j]-x[1,i])**2)
+            exp = -alpha*beta*np.exp(-beta*di)/di
+            H[j,0] = -exp*x[0,i]
+            H[j,1] = -exp*x[1,i]
+
+        C = (u[0, i]*b*np.cos(x[3,i]) 
+                + b*a*u[1,i]*np.sin(x[3,i]) + a*u[0,i])/(b+a*np.cos(x[3,i]))**2
+        F[0,2] = -u[0,i]*np.sin(x[2,i])
+        F[1,2] = u[0,i]*np.cos(x[2,i])
+        F[2,2] = C
+
+        O = np.array([H,H@F,H@F@F,H@F@F@F])
+        rank = np.linalg.matrix_rank(O)
+        ic(np.shape(O))
+        #if rank != n:
+        #    ic(f'not observable in {x}')
+
+check_observability(x,v_m,f_map)
 # PLOT THE SIMULATION OUTPUTS
 
 # Find the scaling factors for covariance bounds
