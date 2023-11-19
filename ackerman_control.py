@@ -48,18 +48,18 @@ q_init = np.array([0.3,-1,np.pi/2,0])
 q_target = np.array([0,0.1,np.pi/2,0])
 #angles_i = np.array([]) #psi, phi
 #angles_f = np.array([])
-# X1,Y1, Psi1, Phi1 = path_gen.generate_path(q_init,q_target,50,v=0.07,w=W)
-
-# M = np.zeros((len(X1),3))
-# M[:,0] = X1
-# M[:,1] = Y1
-# M[:,2] = Psi1
-# df = pd.DataFrame(M, columns = ['x','y','psi'])
-# df.to_csv('path.csv',index=False)
+#X1,Y1, Psi1, Phi1 = path_gen.generate_path(q_init,q_target,50,v=0.07,w=W)
+#
+#M = np.zeros((len(X1),3))
+#M[:,0] = X1
+#M[:,1] = Y1
+#M[:,2] = Psi1
+#df = pd.DataFrame(M, columns = ['x','y','psi'])
+#df.to_csv('path.csv',index=False)
 
 #q_init2 = [X1[-1], Y1[-1],Psi1[-1],Phi1[-1]]
 #path,X2,Y2, Psi2, Phi2 = path_gen.generate_path(q_init2,q_target2,25,v=-5,w=0)
-path = pd.read_csv('/home/dimitria/demo/notebookenv/path_parallel_2.csv')
+path  = pd.read_csv('/home/dimitria/assignments/path.csv')
 
 X1 = path.loc[:,'x'].tolist()
 Y1 = path.loc[:,'y'].tolist()
@@ -73,35 +73,32 @@ X = np.asarray(X1) #-L*np.cos(np.asarray(Psi1))
 Y = np.asarray(Y1) #-L*np.sin(np.asarray(Psi1))
 Psi = np.array(Psi1)
 #Phi = Phi1
-print('path generated', X[-1],Y[-1])
+#print('path generated', X[-1],Y[-1])
 N = np.size(X)
 t = np.arange(0.0, SIM_TIME, SIM_TIME/N)
 x_d = np.zeros((4, N))
 u_d = np.zeros((2, N))
-xi_d = np.zeros((6, N))
-ddz_d = np.zeros((3, N))
+xi_d = np.zeros((4, N))
+ddz_d = np.zeros((2, N))
 # for k in range(0, N):
 x_d[0, :] = X
 x_d[1, :] = Y#R * (1 - np.cos(OMEGA * t[k]))
 x_d[2, :] = Psi+np.pi 
-x_d[3, :] = 0
+x_d[3, :] = 0#Phi1
 u_d[0, :] = -0.07#R * OMEGA
-u_d[1, :] = 0#OMEGA
+u_d[1, :] = u_d[0,:]/L*np.tan(x_d[2,:])#OMEGA
 
 # Pre-compute the extended system reference trajectory
 for k in range(0, N):
     xi_d[0, k] = x_d[0, k]
     xi_d[1, k] = x_d[1, k]
-    xi_d[2, k] = x_d[2, k]
-    xi_d[3, k] = u_d[0, k] * np.cos(x_d[2, k])
-    xi_d[4, k] = u_d[0, k] * np.sin(x_d[2, k])
-    xi_d[5, k] = u_d[0, k]/L * np.tan(x_d[3, k])
+    xi_d[2, k] = u_d[0, k] * np.cos(x_d[2, k])
+    xi_d[3, k] = u_d[0, k] * np.sin(x_d[2, k])
 
 # Pre-compute the extended system reference acceleration
 for k in range(0, N):
-    ddz_d[0, k] = 0#-u_d[0, k] * u_d[1, k] * np.sin(x_d[2, k])
-    ddz_d[1, k] = 0#u_d[0, k] * u_d[1, k] * np.cos(x_d[2, k])
-    ddz_d[2, k] = 0#u_d[0, k] * u_d[1, k] * np.cos(x_d[2, k])
+    ddz_d[0, k] = -u_d[0, k] * u_d[1, k] * np.sin(x_d[2, k])
+    ddz_d[1, k] = u_d[0, k] * u_d[1, k] * np.cos(x_d[2, k])
 # VEHICLE SETUP
 
 # Set the track length of the vehicle [m]
@@ -118,7 +115,7 @@ x_init = np.array([0.3,-1,-np.pi/2,0])
 
 # Setup some arrays
 x = np.zeros((4, N))
-xi = np.zeros((6, N))
+xi = np.zeros((4, N))
 u = np.zeros((2, N))
 x[:, 0] = x_init
 
@@ -129,18 +126,16 @@ u[0, 0] = u_d[0, 0]
 # Initial extended state
 xi[0, 0] = x_init[0]
 xi[1, 0] = x_init[1]
-xi[2, 0] = x_init[2]
-xi[3, 0] = u_d[0, 0] * np.cos(x_init[2])
-xi[4, 0] = u_d[0, 0] * np.sin(x_init[2])
-xi[5, 0] = u_d[0, 0]/L *np.tan(x_init[3])
+xi[2, 0] = u_d[0, 0] * np.cos(x_init[2])
+xi[3, 0] = u_d[0, 0] * np.sin(x_init[2])
+
 
 # Defined feedback linearized state matrices
-A = np.array([[0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 0, 0, 0, 1]
-              , [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]])
-B = np.array([[0, 0, 0], [0, 0, 0],[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
+A = np.array([[0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]])
+B = np.array([[0, 0], [0, 0], [1, 0], [0, 1]])
 
 # Choose pole locations for closed-loop linear system
-p = np.array([-1.0, -2.0, -2.5, -1.5, -0.9, -2])
+p = np.array([-1.0, -2.0, -2.5, -1.5])
 K = signal.place_poles(A, B, p)
 for k in range(1, N):
 
@@ -154,11 +149,8 @@ for k in range(1, N):
     # Update the extended system states
     xi[0, k] = x[0, k]
     xi[1, k] = x[1, k]
-    xi[2, k] = x[2, k]
-    print(k, u_d[0, 0])
-    xi[3, k] = u[0,k-1] * np.cos(x[2, k])
-    xi[4, k] = u[0,k-1] * np.sin(x[2, k])
-    xi[5, 0] = u[0,k-1]/L * np.tan(x[3, k])
+    xi[2, k] = u[0,k-1] * np.cos(x[2, k])
+    xi[3, k] = u[0,k-1] * np.sin(x[2, k])
 
     # Compute the extended linear system input control signals
     eta = K.gain_matrix @ (xi_d[:, k - 1] - xi[:, k - 1]) + ddz_d[:, k - 1]
@@ -167,16 +159,14 @@ for k in range(1, N):
     psi_d = u[0, k -1]/L * np.tan(x[3, k - 1])
     B_n = np.array(
         [
-            [np.cos(x[2, k - 1]), -u[0, k-1]*psi_d*np.sin(x[2, k - 1]) , 1],
-            [np.sin(x[2, k - 1]), u[0, k-1]*psi_d*np.cos(x[2, k - 1]), 1],
-            [1/L * np.tan(x[3, k - 1]), u[0,k-1]/(L*np.cos(x[3, k - 1])**2), 1]
+            [np.cos(x[2, k - 1]), -u[0, k-1]*np.sin(x[2, k - 1])],
+            [np.sin(x[2, k - 1]), u[0, k-1]*np.cos(x[2, k - 1])],
         ]
     )
-    print(np.linalg.det(B_n))
     B_inv = np.linalg.inv(B_n)
     w = B_inv @ eta
     u[0, k] = u[0, k] + T * w[0]
-    u[1, k] = w[1]
+    u[1, k] = np.arctan2(w[1]*L,u[0, k - 1])/T 
 
     # Convert unicycle inputs to differential drive wheel speeds
     #print(x.shape)

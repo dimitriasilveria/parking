@@ -46,10 +46,10 @@ vehicle = Articulated(ell_W_r, ell_T_r, ell_W_f, ell_T_f)
 # BUILD A MAP OF FEATURES IN THE VEHICLE'S ENVIRONMENT
 
 # Number of features
-M = 10
+M = 2
 
 # Map size [m]
-D_MAP = 30
+D_MAP = 20
 
 # Randomly place features in the map
 f_map = np.zeros((2, M))
@@ -71,56 +71,6 @@ SIGMA_RANGE = 0.3
 SIGMA_BEARING = 15 * np.pi / 180
 
 # Create a range and bearing sensor model
-def RandB_sensor(x, f_map, R):
-
-    # Define how many total features are available
-    m = np.shape(f_map)[1]
-
-    # Find the indices of features that are within range [r_min, r_max]
-    a = np.array([])
-    for i in range(0, m):
-        r = np.sqrt((f_map[0, i] - x[0]) ** 2 + (f_map[1, i] - x[1]) ** 2)
-        if np.all(
-            [
-                r < R_MAX,
-                r > R_MIN,
-            ]
-        ):
-            a = np.append(a, i)
-
-    # Compute the range and bearing to all features within range
-    if np.shape(a)[0] > 0:
-        # Specify the size of the output
-        m_k = np.shape(a)[0]
-        y = np.zeros(2 * m_k)
-
-        # Compute the range and bearing to all features (including sensor noise)
-        for i in range(0, m_k):
-            # Range measurement [m]
-            y[2 * i] = np.sqrt(
-                (f_map[0, int(a[i])] - x[0]) ** 2 + (f_map[1, int(a[i])] - x[1]) ** 2
-            ) + np.sqrt(R[0, 0]) * np.random.randn(1)
-            # Bearing measurement [rad]
-            y[2 * i + 1] = (
-                np.unwrap(
-                    np.array(
-                        [
-                            np.arctan2(
-                                f_map[1, int(a[i])] - x[1], f_map[0, int(a[i])] - x[0]
-                            )
-                            - x[2]
-                        ]
-                    )
-                )
-                - np.pi
-                + np.sqrt(R[1, 1]) * np.random.randn(1)
-            )
-    else:
-        # No features were found within the sensing range
-        y = np.array([])
-
-    # Return the range and bearing to features in y with indices in a
-    return y, a
 
 # Create a range and bearing sensor model
 def transmitter_sensor(x, transm, R, alpha, beta):
@@ -138,7 +88,6 @@ def transmitter_sensor(x, transm, R, alpha, beta):
         # Range measurement [m]
         r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
         y[i] = alpha*np.exp(-beta*r) + np.sqrt(R[0, 0]) * np.random.randn(1)
-        print('y',y)
 
     # Return the range and bearing to features in y with indices in a
     return y
@@ -207,7 +156,6 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
     w_x = 0.5 / (n_x + kappa) * np.ones(2 * n_x + 1)
     w_x[0] = 2 * kappa * w_x[0]
     y_hat = np.average(y_hat_sig, axis=1, weights=w_x)
-    print('y_hat',y_hat)
     P_y = np.zeros((m_k,m_k))
     P_xy = np.zeros((n_x, m_k))
     for i in range(0, 2 * n_x + 1):
@@ -263,8 +211,8 @@ P_hat_UKF = np.zeros((4, 4, N))
 x_init = np.zeros(4)
 
 # Set the initial guess of the estimator
-x_guess = x_init + np.array([5.0, -5.0, 0.1,0.1])
-P_guess = np.diag(np.square([5.0, -5.0, 0.1,0.1]))
+x_guess = x_init + np.array([30.0, -30.0, 0.1,0.1])
+P_guess = np.diag(np.square([30.0, -30.0, 0.1,0.1]))
 
 # Set the initial conditions
 x[:, 0] = x_init
@@ -312,40 +260,48 @@ s1 = chi2.isf(alpha, 1)
 s2 = chi2.isf(alpha, 2)
 
 # Set some plot limits for better viewing
-x_range = 15
-y_range = 15
+x_range = 30
+y_range = 30
 theta_range = 1
 phi_range = 1
 
 # Plot the errors with covariance bounds
-sigma = np.zeros((3, N))
+sigma = np.zeros((4, N))
 fig1 = plt.figure(1)
-ax1 = plt.subplot(311)
+ax1 = plt.subplot(411)
 sigma[0, :] = np.sqrt(s1 * P_hat_UKF[0, 0, :])
 plt.fill_between(t, -sigma[0, :], sigma[0, :], color="C0", alpha=0.2)
 plt.plot(t, x[0, :] - x_hat_UKF[0, :], "C0")
-plt.ylabel(r"$e_1$ [m]")
+plt.ylabel(r"$x$ [m]")
 plt.setp(ax1, xticklabels=[])
 ax1.set_ylim([-x_range, x_range])
 plt.grid(color="0.95")
-ax2 = plt.subplot(312)
+ax2 = plt.subplot(412)
 sigma[1, :] = np.sqrt(s1 * P_hat_UKF[1, 1, :])
 plt.fill_between(t, -sigma[1, :], sigma[1, :], color="C0", alpha=0.2)
 plt.plot(t, x[1, :] - x_hat_UKF[1, :], "C0")
-plt.ylabel(r"$e_2$ [m]")
+plt.ylabel(r"$y$ [m]")
 plt.setp(ax2, xticklabels=[])
 ax2.set_ylim([-y_range, y_range])
 plt.grid(color="0.95")
-ax3 = plt.subplot(313)
+ax3 = plt.subplot(413)
 sigma[2, :] = np.sqrt(s1 * P_hat_UKF[2, 2, :])
 plt.fill_between(t, -sigma[2, :], sigma[2, :], color="C0", alpha=0.2)
 plt.plot(t, x[2, :] - x_hat_UKF[2, :], "C0")
-plt.ylabel(r"$e_3$ [rad]")
+plt.ylabel(r"$\theta$ [rad]")
 plt.setp(ax3, xticklabels=[])
 ax3.set_ylim([-theta_range, theta_range])
 plt.xlabel(r"$t$ [s]")
 plt.grid(color="0.95")
-
+ax4 = plt.subplot(414)
+sigma[3, :] = np.sqrt(s1 * P_hat_UKF[3, 3, :])
+plt.fill_between(t, -sigma[3, :], sigma[3, :], color="C0", alpha=0.2)
+plt.plot(t, x[3, :] - x_hat_UKF[3, :], "C0")
+plt.ylabel(r"$\phi$ [rad]")
+plt.setp(ax3, xticklabels=[])
+ax3.set_ylim([-theta_range, theta_range])
+plt.xlabel(r"$t$ [s]")
+plt.grid(color="0.95")
 # Plot the actual versus estimated positions on the map
 fig2, ax = plt.subplots()
 circle = Circle(x[0:2, 0], radius=R_MAX, alpha=0.2, color="C0", label="Sensing range")

@@ -317,7 +317,7 @@ class Path_Generator():
         plt.plot(0,0, markersize=14)
 
         #plt.axis("off")
-        plt.show()
+        #plt.show()
 
 if __name__ == '__main__':
     L = 0.26
