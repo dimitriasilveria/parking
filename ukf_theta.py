@@ -46,7 +46,7 @@ vehicle = Articulated(ell_W_r, ell_T_r, ell_W_f, ell_T_f)
 # BUILD A MAP OF FEATURES IN THE VEHICLE'S ENVIRONMENT
 
 # Number of features
-M = 4
+M = 3
 
 # Map size [m]
 D_MAP = 30
@@ -131,7 +131,7 @@ def transmitter_sensor(x, transm, R, alpha, beta):
 
 
     m_k = np.shape(transm)[1]
-    y = np.zeros(m_k)
+    y = np.zeros(m_k+1)
 
         # Compute the range and bearing to all features (including sensor noise)
     for i in range(0, m_k):
@@ -139,6 +139,7 @@ def transmitter_sensor(x, transm, R, alpha, beta):
         r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
         y[i] = alpha*np.exp(-beta*r) + np.sqrt(R[0, 0]) * np.random.randn(1)
 
+    y[m_k] = x[2] + np.sqrt(R[1, 1]) * np.random.randn(1)
     # Return the range and bearing to features in y with indices in a
     return y
 
@@ -182,7 +183,7 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
     P_hat = P_xi[0:n_x, 0:n_x]
 
     # Find the number of observed features
-    m_k = np.shape(f_map)[1]
+    m_k = np.shape(f_map)[1] + 1
 
     # Compute a new set of sigma points using the latest x_hat and P_hat
     x_sig = np.zeros((n_x, 2 * n_x + 1))
@@ -195,13 +196,13 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
     y_hat_sig = np.zeros((m_k, 2 * n_x + 1))
     for j in range(0, 2 * n_x + 1):
         # Compute the expected measurements
-        for i in range(0, m_k):
+        for i in range(0, m_k-1):
             r = np.sqrt(
                 (f_map[0, i] - x_sig[0, j]) ** 2
                 + (f_map[1, i] - x_sig[1, j]) ** 2
             )
             y_hat_sig[i, j] = alpha*np.exp(-beta*r)
-            
+        y_hat_sig[m_k-1,j] =  x_sig[2, j]  
     # Recombine the sigma points
     w_x = 0.5 / (n_x + kappa) * np.ones(2 * n_x + 1)
     w_x[0] = 2 * kappa * w_x[0]
@@ -217,7 +218,7 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
         P_xy = P_xy + w_x[i] * (x_diff.reshape((n_x, 1))) @ np.transpose(
             y_diff.reshape(( m_k, 1))
         )
-    P_y = P_y + np.kron(np.identity(m_k), R)
+    P_y = P_y + R#np.kron(np.identity(m_k), R)
 
     # Help to keep the covariance matrix symmetrical
     P_y = (P_y + np.transpose(P_y)) / 2
@@ -238,6 +239,7 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
 # SIMULATE THE SYSTEM
 S_v = 0.025
 S_phi = 0.018
+S_theta = 0.018
 S_r = 0.23
 # Number of transmitters
 
@@ -249,7 +251,11 @@ beta=0.03
 Q = np.diag([S_v ** 2, 2*S_phi ** 2/T])
 # Set the covariance matrices
 #Q = np.diag([SIGMA_SPEED ** 2, SIGMA_SPEED ** 2])
-R = np.diag([S_r ** 2])
+R = np.eye(M+1)
+R = S_r ** 2*R
+R[-1,-1] = S_theta ** 2
+ic(R)
+#R = np.diag([S_r ** 2, S_theta ** 2])
 
 # Initialize state, input, and estimator variables
 x = np.zeros((4, N))
@@ -322,11 +328,11 @@ def check_observability(x, u,x_m):
                 + b*a*u[1,i]*np.sin(x[3,i]) + a*u[0,i])/(b+a*np.cos(x[3,i]))**2
         F[0,2] = -u[0,i]*np.sin(x[2,i])
         F[1,2] = u[0,i]*np.cos(x[2,i])
-        F[2,3] = C
+        F[2,2] = C
         #ic(H)
         O = np.concatenate(([H,(H@F),(H@F@F),(H@F@F@F)]),axis=0)
         rank = np.linalg.matrix_rank(O)
-        ic(O)
+        #ic(rank)
         #if rank != n:
         #    ic(f'not observable in {x}')
 
