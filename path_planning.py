@@ -212,7 +212,7 @@ class Path_Generator():
         self.q_init = q_init
         self.v = v
         self.W = w
-        dt = 1/400
+        dt = 1/50
         X = []
         Y = []
         while 1:
@@ -231,7 +231,7 @@ class Path_Generator():
             radius = 4
             self.first = True
             i = 1
-            while 1:
+            for _ in range(N):
                 print(i)
                 x_rand = self.random_points(x_last)               
                 x_new = self.cost(x_rand,x_last)
@@ -317,7 +317,7 @@ class Path_Generator():
         plt.plot(0,0, markersize=14)
 
         #plt.axis("off")
-        plt.show()
+        #plt.show()
 
 if __name__ == '__main__':
     L = 0.26

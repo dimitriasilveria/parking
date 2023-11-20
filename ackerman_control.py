@@ -16,7 +16,7 @@ from path_planning import Path_Generator
 import pandas as pd
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 15.0
-T = 0.04
+T = 1/50
 
 # Create an array of time values [s]
 
@@ -36,11 +36,11 @@ OMEGA = 0.1
 
 L = 0.26
 W = 0.17
-spot_length = 0.8
+spot_length = 0.6
 path_gen = Path_Generator(car_length=L,obst_tol=0,target_tol=0.2,radius=1)
-obs_1 = [[-0.05,0],[0.05,0.25]]
-obs_2 = [[-0.05,-spot_length-0.25],[0.05,-spot_length]]
-obs_3 = [[obs_1[1][0]+W/2,obs_1[0][1]-L],[obs_1[1][0]+3/2*W,obs_1[0][1]]]
+obs_1 = [[-0.07,0.1],[0.07,0.35]]
+obs_2 = [[-0.07,-spot_length-0.25],[0.07,-spot_length]]
+obs_3 = [[obs_1[1][0]+W,obs_1[0][1]-L],[obs_1[1][0]+2*W,obs_1[0][1]]]
 path_gen.set_obstacles(obs_1)
 path_gen.set_obstacles(obs_2)
 path_gen.set_obstacles(obs_3)
@@ -48,7 +48,7 @@ q_init = np.array([0.3,-1,np.pi/2,0])
 q_target = np.array([0,0.1,np.pi/2,0])
 #angles_i = np.array([]) #psi, phi
 #angles_f = np.array([])
-X1,Y1, Psi1, Phi1 = path_gen.generate_path(q_init,q_target,50,v=0.07,w=W)
+#X1,Y1, Psi1, Phi1 = path_gen.generate_path(q_init,q_target,50,v=0.07,w=W)
 
 #M = np.zeros((len(X1),3))
 #M[:,0] = X1
@@ -59,11 +59,11 @@ X1,Y1, Psi1, Phi1 = path_gen.generate_path(q_init,q_target,50,v=0.07,w=W)
 
 #q_init2 = [X1[-1], Y1[-1],Psi1[-1],Phi1[-1]]
 #path,X2,Y2, Psi2, Phi2 = path_gen.generate_path(q_init2,q_target2,25,v=-5,w=0)
-#path = pd.read_csv('/home/dimitria/demo/notebookenv/path_parallel_2.csv')
+path = pd.read_csv('path.csv')
 
-#X1 = path.loc[:,'x'].tolist()
-#Y1 = path.loc[:,'y'].tolist()
-#Psi1 = path.loc[:,'psi'].tolist()
+X1 = path.loc[:,'x'].tolist()
+Y1 = path.loc[:,'y'].tolist()
+Psi1 = path.loc[:,'psi'].tolist()
 #path,X1,Y1, Psi1, Phi1 = path_gen.generate_path([X1[-1],Y1[-1],Psi1[-1],Phi1[-1]]
 #,[0.1,0.1,np.pi/2,0],0.1,v=0.11,w=0)
 
@@ -99,7 +99,7 @@ vehicle = Ackermann(L,W)
 # SIMULATE THE CLOSED-LOOP SYSTEM
 
 # Initial conditions
-x_init = q_init
+x_init = np.array([0.3,-1,-np.pi/2,0])
 # Setup some arrays
 x = np.zeros((4, N))
 u = np.zeros((2, N))
@@ -129,9 +129,10 @@ for k in range(1, N):
                   ,[np.tan(x_d[3,k-1])/L, 0], [0, 1]])
 
     # Compute the gain matrix to place poles of (A-BK) at p
-    p = np.array([-1.2, -2., -1.8, -2])
+    p = np.array([-1., -2., -6, -6.5])
     K = signal.place_poles(A, B, p)
-
+    if abs(u[1,k]*T) > 0.6:
+        u[1,k] = np.sign(u[1,k])*0.6
     # Compute the controls (v, omega) and convert to wheel speeds (v_L, v_R)
     u[:,k] = -K.gain_matrix @ (x[:, k - 1] - x_d[:, k - 1]) + u_d[:, k - 1]
     #print(x.shape)
@@ -171,8 +172,8 @@ plt.legend()
 # Plot the position of the vehicle in the plane
 fig2 = plt.figure(2)
 path_gen.plot_path(X,Y)
-plt.plot(X,Y)
-plt.plot(x[0, :], x[1, :])
+plt.plot(X,Y, label="Desired Path")
+plt.plot(x[0, :], x[1, :], label='Controller Path')
 plt.axis("equal")
 X_BL, Y_BL, X_BR, Y_BR, X_FL, Y_FL, X_FR, Y_FR, X_BD, Y_BD = vehicle.draw(
     x[0, 0], x[1, 0], x[2, 0], phi[0,0], phi[1,0]
