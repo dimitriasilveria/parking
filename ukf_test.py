@@ -46,10 +46,10 @@ vehicle = Articulated(ell_W_r, ell_T_r, ell_W_f, ell_T_f)
 # BUILD A MAP OF FEATURES IN THE VEHICLE'S ENVIRONMENT
 
 # Number of features
-M = 4
+M = 3
 
 # Map size [m]
-D_MAP = 30
+D_MAP = 10
 
 # Randomly place features in the map
 f_map = np.zeros((2, M))
@@ -246,7 +246,7 @@ alpha=12
 beta=0.03
 #m = 2 #number of transmitters
 # Set the covariance matrices
-Q = np.diag([S_v ** 2, 2*S_phi ** 2/T])
+Q = np.diag([S_v ** 2, 2*S_phi ** 2/T**2])
 # Set the covariance matrices
 #Q = np.diag([SIGMA_SPEED ** 2, SIGMA_SPEED ** 2])
 R = np.diag([S_r ** 2])
@@ -276,9 +276,9 @@ for i in range(1, N):
 
     # Compute some inputs (i.e., drive around)
     if i < N/2:
-        v = np.array([1, 0.1])
+        v = np.array([1, 0.])
     else:
-        v = np.array([1, -0.1])
+        v = np.array([1, -0.])
 
     # Run the vehicle motion model
     x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
@@ -310,13 +310,12 @@ def check_observability(x, u,x_m):
     m = np.shape(x_m)[1]
     H = np.zeros((m,n))
     F = np.zeros((n,n))
-    O = np.zeros((n*m,n))
     for i in range(N):
         for j in range(m):
             di = np.sqrt((x_m[0,j]-x[0,i])**2 +(x_m[1,j]-x[1,i])**2)
             exp = -alpha*beta*np.exp(-beta*di)/di
-            H[j,0] = -exp*x[0,i]
-            H[j,1] = -exp*x[1,i]
+            H[j,0] = -exp*(x_m[0,j]-x[0,i])
+            H[j,1] = -exp*(x_m[1,j]-x[1,i])
 
         C = (u[0, i]*b*np.cos(x[3,i]) 
                 + b*a*u[1,i]*np.sin(x[3,i]) + a*u[0,i])/(b+a*np.cos(x[3,i]))**2
@@ -326,7 +325,7 @@ def check_observability(x, u,x_m):
         #ic(H)
         O = np.concatenate(([H,(H@F),(H@F@F),(H@F@F@F)]),axis=0)
         rank = np.linalg.matrix_rank(O)
-        ic(O)
+        ic(rank)
         #if rank != n:
         #    ic(f'not observable in {x}')
 
@@ -345,34 +344,42 @@ theta_range = 1
 phi_range = 1
 
 # Plot the errors with covariance bounds
-sigma = np.zeros((3, N))
+sigma = np.zeros((4, N))
 fig1 = plt.figure(1)
-ax1 = plt.subplot(311)
+ax1 = plt.subplot(411)
 sigma[0, :] = np.sqrt(s1 * P_hat_UKF[0, 0, :])
 plt.fill_between(t, -sigma[0, :], sigma[0, :], color="C0", alpha=0.2)
 plt.plot(t, x[0, :] - x_hat_UKF[0, :], "C0")
-plt.ylabel(r"$e_1$ [m]")
+plt.ylabel(r"$x$ [m]")
 plt.setp(ax1, xticklabels=[])
 ax1.set_ylim([-x_range, x_range])
 plt.grid(color="0.95")
-ax2 = plt.subplot(312)
+ax2 = plt.subplot(412)
 sigma[1, :] = np.sqrt(s1 * P_hat_UKF[1, 1, :])
 plt.fill_between(t, -sigma[1, :], sigma[1, :], color="C0", alpha=0.2)
 plt.plot(t, x[1, :] - x_hat_UKF[1, :], "C0")
-plt.ylabel(r"$e_2$ [m]")
+plt.ylabel(r"$y$ [m]")
 plt.setp(ax2, xticklabels=[])
 ax2.set_ylim([-y_range, y_range])
 plt.grid(color="0.95")
-ax3 = plt.subplot(313)
+ax3 = plt.subplot(413)
 sigma[2, :] = np.sqrt(s1 * P_hat_UKF[2, 2, :])
 plt.fill_between(t, -sigma[2, :], sigma[2, :], color="C0", alpha=0.2)
 plt.plot(t, x[2, :] - x_hat_UKF[2, :], "C0")
-plt.ylabel(r"$e_3$ [rad]")
+plt.ylabel(r"$\theta$ [rad]")
 plt.setp(ax3, xticklabels=[])
 ax3.set_ylim([-theta_range, theta_range])
 plt.xlabel(r"$t$ [s]")
 plt.grid(color="0.95")
-
+ax4 = plt.subplot(414)
+sigma[3, :] = np.sqrt(s1 * P_hat_UKF[3, 3, :])
+plt.fill_between(t, -sigma[3, :], sigma[3, :], color="C0", alpha=0.2)
+plt.plot(t, x[3, :] - x_hat_UKF[3, :], "C0")
+plt.ylabel(r"$\phi$ [rad]")
+plt.setp(ax3, xticklabels=[])
+ax3.set_ylim([-theta_range, theta_range])
+plt.xlabel(r"$t$ [s]")
+plt.grid(color="0.95")
 # Plot the actual versus estimated positions on the map
 fig2, ax = plt.subplots()
 circle = Circle(x[0:2, 0], radius=R_MAX, alpha=0.2, color="C0", label="Sensing range")
@@ -390,3 +397,4 @@ plt.legend()
 
 # Show the plot to the screen
 plt.show()
+
