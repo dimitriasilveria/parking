@@ -23,7 +23,9 @@ def main():
     env = LunarHeistEnv()
     actions = env.action_space
     # TODO: Define the state_bins based on the observation space of the environment
-    state_bins = np.arange(-1,1+0.1,0.1)  # Placeholder for student code
+    bin_1 = np.round(np.arange(-1,1+0.1,0.1),1).tolist()
+    bin_2 = np.round(np.arange(0,1+0.1,0.1),1).tolist()
+    state_bins = [bin_1, bin_2,bin_1,bin_1]  # Placeholder for student code
     
     # TODO: Instantiate the QLearningAgent and DQNAgent here
     q_learning_agent = QLearningAgent(actions,alpha,gamma,min_epsilon,state_bins)  # Placeholder for student code

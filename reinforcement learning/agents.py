@@ -9,6 +9,7 @@ import numpy as np
 import random
 from collections import deque
 from icecream import ic
+import pandas as pd
 # TODO: Import any additional libraries you need for the DQN agent
 #Feel free to change these methods/remove or add them
 class QLearningAgent:
@@ -23,11 +24,16 @@ class QLearningAgent:
         self.action_space = np.arange(self.n_actions)
         self.n_obs = 4
         self.disc_bins = discretize_bins
-        s = len(discretize_bins)
+        
+        sx = len(discretize_bins[0])
+        sy = len(discretize_bins[1])
+        svx = len(discretize_bins[2])
+        svy = len(discretize_bins[3])
+        
         # TODO: Initialize the Q-table here
-        self.q_table = np.ones((s,s,s,s,self.n_actions))  # Placeholder for student code
+        self.q_table = 0.1*np.ones((sx,sy,svx,svy,2,2,self.n_actions))  # Placeholder for student code
         self.step = 0
-
+        ic(sx)
     def discretize_state(self, state):
         # TODO: Discretize the state
         # we have 4 observations:         
@@ -37,8 +43,27 @@ class QLearningAgent:
         #The vertical velocity (vy) [-1,1]
         #let's say I want each of them discretazing in 100 possible values
         state = np.array(state)
-        #print(state)
-        state = (1 + np.round(state,1))*10 -1
+        #labels = np.arange(0,len(self.disc_bins[0])-1,1).tolist()
+        # for i in range(len(self.disc_bins[0])):
+        #     ic(self.disc_bins[0][i],labels[i])
+        df = pd.DataFrame({"x":[state[0]], "y":[state[1]],"vx":[state[2]],"vy":[state[3]]})
+        df['x_bin']=pd.cut(x = df['x'],
+                        bins = self.disc_bins[0], 
+                        labels = np.arange(0,len(self.disc_bins[0])-1,1).tolist())
+        df['y_bin']=pd.cut(x = df['y'],
+                        bins = self.disc_bins[1], 
+                        labels = np.arange(0,len(self.disc_bins[1])-1,1).tolist())
+        df['vx_bin']=pd.cut(x = df['vx'],
+                        bins = self.disc_bins[2], 
+                        labels = np.arange(0,len(self.disc_bins[2])-1,1).tolist())
+        df['vy_bin']=pd.cut(x = df['vy'],
+                        bins = self.disc_bins[3], 
+                        labels = np.arange(0,len(self.disc_bins[3])-1,1).tolist())
+        ic(df.head)
+        state[0] = df['x_bin'].loc[0]
+        state[1] = df['y_bin'].loc[0]
+        state[2] = df['vx_bin'].loc[0]
+        state[3] = df['y_bin'].loc[0]
         
         return state.astype(int)
 

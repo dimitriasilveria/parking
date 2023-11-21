@@ -5,6 +5,7 @@ from gym.utils import seeding
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 import pygame
+import pandas as pd
 
 # The LunarHeist class will inherit from gym.Env and will need to implement the following methods:
 # __init__, step, reset, render, close, and seed.
