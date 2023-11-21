@@ -26,6 +26,7 @@ class QLearningAgent:
         s = len(discretize_bins)
         # TODO: Initialize the Q-table here
         self.q_table = np.ones((s,s,s,s,self.n_actions))  # Placeholder for student code
+        self.step = 0
 
     def discretize_state(self, state):
         # TODO: Discretize the state
@@ -42,16 +43,20 @@ class QLearningAgent:
         return state.astype(int)
 
 
+    def add_step(self):
+        self.step +=1
 
     def choose_action(self, state):
         # TODO: Implement the action selection method
         
         state = self.discretize_state(state)
-        p = self.e/(self.n_actions-1)*np.ones(self.n_actions) #vector to store the probabilities for the actions, on that particular state
+        sample = random.random()
+        if sample <=self.e:
+            action = np.random.choice(self.action_space)
+        else:
         #search for the greedy action:
-        greedy = np.argmax(self.q_table[state[0],state[1],state[2],state[3],:])
-        p[greedy] = 1 - self.e
-        action = np.random.choice(self.action_space, p=p)
+            action = np.argmax(self.q_table[state[0],state[1],state[2],state[3],:])
+
         return action
 
 
@@ -73,37 +78,117 @@ class QLearningAgent:
 
 
 
-# class DQNAgent:
-#     def __init__(self, state_size, action_size, learning_rate, gamma):
-#         # Initialize attributes
-#         # ...
+class DQNAgent:
+    def __init__(self, state_size, action_size, learning_rate, gamma):
+        # Initialize attributes
+        self.gamma = gamma
+        self.alpha = learning_rate
+        self.action_size = action_size
+        self.action_space = np.arange(4)
+        self.state_size = state_size
+        self.e_start = 1.0
+        self.e_end = 0.02
+        self.e_decay = 1000
+        self.target_up_freq = 1000
+        buffer_size = 800000
+        self.buffer_replay = deque(maxlen=buffer_size)
+        self.buffer_reward = deque([0,0], maxlen=1000)
+        self.online_nn = NNetwork(self.state_size, self.action_size)
+        self.target_nn = NNetwork(self.state_size, self.action_size)
 
-#         # TODO: Create the model
-#         self.model = self._build_model()  # Placeholder for student code
+        self.target_nn.load_state_dict(self.online_nn.state_dict())
 
-#     def _build_model(self):
-#         # TODO: Build the Neural Network model here
-#         # ...
+        self.grad = torch.optim.SGD(self.alpha)
 
-#     def choose_action(self, state):
-#         # TODO: Implement the action selection method
-#         # ...
+        self.step = 0
+        # TODO: Create the model
+        self.model = self._build_model()  # Placeholder for student code
 
-#     def remember(self, state, action, reward, next_state, done):
-#         # TODO: Implement the method to store experience in memory
-#         # ...
+    def _build_model(self):
+        # TODO: Build the Neural Network model here
+        pass
 
-#     def replay(self, batch_size):
-#         # TODO: Implement method to train the network with replay buffer
-#         # ...
+    def choose_action(self, state):
+        # TODO: Implement the action selection method
+        sample = random.random()
+        if sample <=self.e:
+            action = np.random.choice(self.action_space)
+        else:
+            action = self.online_nn.act(state)
 
-#     def load(self, name):
-#         # TODO: Implement the method to load the model
-#         # ...
+        return action
+    
+    def remember(self, state, action, reward, next_state, done):
+        # TODO: Implement the method to store experience in memory
+        experience = (state, action, reward, next_state, done)
+        self.buffer_replay.append(experience)
 
-#     def save(self, name):
-#         # TODO: Implement the method to save the model
-#         # ...
+    def replay(self, batch_size):
+        # TODO: Implement method to train the network with replay buffer
+        experience = random.sample(self.buffer_replay, batch_size)
+        state = np.asarray(exp[0] for exp in experience)
+        action = np.asarray(exp[1] for exp in experience)
+        reward = np.asarray(exp[2] for exp in experience)
+        next_state = np.asarray(exp[3] for exp in experience)
+        done = np.asarray(exp[4] for exp in experience)
+
+        state = torch.as_tensor(state)
+        action = torch.as_tensor(action)
+        reward = torch.as_tensor(reward)
+        next_state = torch.as_tensor(next_state)
+        done = torch.as_tensor(done)
+
+        target_qs = self.target_nn(next_state) #computes the target values for all the possible actions that lead to next_state
+        q_greedy = target_qs.max(dim=1, keepdim=True)[0] # gets the action value for the greedy action
+        q_target = reward + self.gamma*(1-done)*q_greedy #updates the target using the greedy action value
+
+        #loss computation
+        q = self.online_nn(state) #uses the online nn to estimate the taken action value
+        q_action = torch.gather(input = q, dim=1,index = action)
+        loss = nn.functional.smooth_l1_loss(q_action, q_target)
+
+        # Gradient
+        self.grad.zero_grad()
+        loss.backward()
+        self.grad.step()
+
+        #updating the target network each target_up_freq steps
+        if self.step%self.target_up_freq == 0:
+
+            self.target_nn.load_state_dict(self.online_nn.state_dict())
 
 
+        
+
+
+
+    def load(self, name):
+        # TODO: Implement the method to load the model
+        pass
+    def save(self, name):
+        # TODO: Implement the method to save the model
+        pass
+
+    def add_step(self):
+        self.step +=1
+        
 # # TODO: You may create additional classes/functions as needed.
+
+class NNetwork(nn.Module):
+    def __init__(self, state_size, actions_n):
+        features = int(state_size)
+        self.network = nn.Sequential(
+            nn.Linear(features,65),
+            nn.Tanh(),
+            nn.Linear(64,actions_n)
+        )
+
+    def forward(self,x):
+
+        return self.net(x)    
+    
+    def act(self, state):
+        state_t = torch.as_tensor(state, dtype = torch.float32)
+        q = self(state_t.unsqueeze[0])
+        q_greedy = torch.argmax(q, dim=1)[0]
+        action = q_greedy.detach().item()
