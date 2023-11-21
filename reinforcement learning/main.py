@@ -27,7 +27,7 @@ def main():
     
     # TODO: Instantiate the QLearningAgent and DQNAgent here
     q_learning_agent = QLearningAgent(actions,alpha,gamma,min_epsilon,state_bins)  # Placeholder for student code
-    dqn_agent = DQNAgent(env.observation_space.shape, actions.n, alpha, gamma)  # Placeholder for student code
+    dqn_agent = DQNAgent(env.observation_space.shape[0], actions.n, alpha, gamma)  # Placeholder for student code
     batch_size = 128
 
     # Initialize lists for detailed logs
@@ -52,12 +52,12 @@ def main():
             #if step%2 == 0:
 
             #q learning
-            action = q_learning_agent.choose_action(state)  # Placeholder for student code
-            # TODO: Take a step in the environment using the chosen action
-            next_state, reward, done, info = env.step(action)  # Placeholder for student code
-            # TODO: Update the QLearningAgent or DQNAgent with the new experience
-            # Placeholder for student code
-            q_learning_agent.update(state,action,reward,next_state,done)
+            # action = q_learning_agent.choose_action(state)  # Placeholder for student code
+            # # TODO: Take a step in the environment using the chosen action
+            # next_state, reward, done, info = env.step(action)  # Placeholder for student code
+            # # TODO: Update the QLearningAgent or DQNAgent with the new experience
+            # # Placeholder for student code
+            # q_learning_agent.update(state,action,reward,next_state,done)
             
             #dqn
             action = dqn_agent.choose_action(state)

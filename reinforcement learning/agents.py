@@ -8,7 +8,7 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
-
+from icecream import ic
 # TODO: Import any additional libraries you need for the DQN agent
 #Feel free to change these methods/remove or add them
 class QLearningAgent:
@@ -78,7 +78,7 @@ class QLearningAgent:
 
 
 
-class DQNAgent:
+class DQNAgent(nn.Module):
     def __init__(self, state_size, action_size, learning_rate, gamma):
         # Initialize attributes
         self.gamma = gamma
@@ -93,25 +93,31 @@ class DQNAgent:
         buffer_size = 800000
         self.buffer_replay = deque(maxlen=buffer_size)
         self.buffer_reward = deque([0,0], maxlen=1000)
+
+        super().__init__()
         self.online_nn = NNetwork(self.state_size, self.action_size) #behavior policy
         self.target_nn = NNetwork(self.state_size, self.action_size) #target policy
 
+        #self.target_nn = self._build_model() #target policy
+        
         self.target_nn.load_state_dict(self.online_nn.state_dict())
 
-        self.grad = torch.optim.SGD(self.alpha)
+        self.grad = optim.AdamW(self.online_nn.parameters(), lr=self.alpha, amsgrad=True)
 
         self.step = 0
         # TODO: Create the model
-        self.model = self._build_model()  # Placeholder for student code
+        #self.model = self._build_model()  # Placeholder for student code
 
     def _build_model(self):
-        # TODO: Build the Neural Network model here
-        pass
+        super(NNetwork, self).__init__()
+        self.online_nn = NNetwork(self.state_size, self.action_size) #behavior policy
+        self.target_nn = NNetwork(self.state_size, self.action_size) #target policy
+
 
     def choose_action(self, state):
         # TODO: Implement the action selection method
         sample = random.random()
-        if sample <=self.e:
+        if sample <=self.e_end:
             action = np.random.choice(self.action_space)
         else:
             action = self.online_nn.act(state)
@@ -126,7 +132,7 @@ class DQNAgent:
 
     def replay(self, batch_size):
         # TODO: Implement method to train the network with replay buffer
-        if batch_size < len(self.buffer_replay):
+        if batch_size > len(self.buffer_replay):
             return
         experience = random.sample(self.buffer_replay, batch_size)
         state = np.asarray(exp[0] for exp in experience)
@@ -181,21 +187,28 @@ class DQNAgent:
 # # TODO: You may create additional classes/functions as needed.
 
 class NNetwork(nn.Module):
+
     def __init__(self, state_size, actions_n):
-        features = int(state_size)
+        super(NNetwork, self).__init__()
+        # self.layer1 = nn.Linear(state_size, 128)
+        # self.layer2 = nn.Linear(128, 128)
+        # self.layer3 = nn.Linear(128, actions_n)
+    # def __init__(self, state_size, actions_n):
+    #     features = int(state_size)
         self.network = nn.Sequential(
-            nn.Linear(features,65),
+            nn.Linear(state_size,64),
             nn.Tanh(),
             nn.Linear(64,actions_n)
         )
 
     def forward(self,x):
 
-        return self.net(x)    
+        return self.network(x)    
     
     def act(self, state):
         state_t = torch.as_tensor(state, dtype = torch.float32)
-        q = self(state_t.unsqueeze[0])
+        #with torch.no_grad():
+        q = self(torch.unsqueeze(state_t,0))
         q_greedy = torch.argmax(q, dim=1)[0]
         action = q_greedy.detach().item()
         return action
