@@ -93,8 +93,8 @@ class DQNAgent:
         buffer_size = 800000
         self.buffer_replay = deque(maxlen=buffer_size)
         self.buffer_reward = deque([0,0], maxlen=1000)
-        self.online_nn = NNetwork(self.state_size, self.action_size)
-        self.target_nn = NNetwork(self.state_size, self.action_size)
+        self.online_nn = NNetwork(self.state_size, self.action_size) #behavior policy
+        self.target_nn = NNetwork(self.state_size, self.action_size) #target policy
 
         self.target_nn.load_state_dict(self.online_nn.state_dict())
 
@@ -123,8 +123,11 @@ class DQNAgent:
         experience = (state, action, reward, next_state, done)
         self.buffer_replay.append(experience)
 
+
     def replay(self, batch_size):
         # TODO: Implement method to train the network with replay buffer
+        if batch_size < len(self.buffer_replay):
+            return
         experience = random.sample(self.buffer_replay, batch_size)
         state = np.asarray(exp[0] for exp in experience)
         action = np.asarray(exp[1] for exp in experience)
@@ -132,16 +135,18 @@ class DQNAgent:
         next_state = np.asarray(exp[3] for exp in experience)
         done = np.asarray(exp[4] for exp in experience)
 
-        state = torch.as_tensor(state)
-        action = torch.as_tensor(action)
-        reward = torch.as_tensor(reward)
-        next_state = torch.as_tensor(next_state)
-        done = torch.as_tensor(done)
+
+        state = torch.as_tensor(state, dtype = torch.float32).unsqueeze(-1)
+        action = torch.as_tensor(action,dtype = torch.int64).unsqueeze(-1)
+        reward = torch.as_tensor(reward,dtype = torch.float32).unsqueeze(-1)
+        next_state = torch.as_tensor(next_state, dtype = torch.float32).unsqueeze(-1)
+        done = torch.as_tensor(done, dtype = torch.float32).unsqueeze(-1)
 
         target_qs = self.target_nn(next_state) #computes the target values for all the possible actions that lead to next_state
         q_greedy = target_qs.max(dim=1, keepdim=True)[0] # gets the action value for the greedy action
         q_target = reward + self.gamma*(1-done)*q_greedy #updates the target using the greedy action value
 
+        #optmizing the online network
         #loss computation
         q = self.online_nn(state) #uses the online nn to estimate the taken action value
         q_action = torch.gather(input = q, dim=1,index = action)
@@ -171,7 +176,8 @@ class DQNAgent:
 
     def add_step(self):
         self.step +=1
-        
+        return self.step
+
 # # TODO: You may create additional classes/functions as needed.
 
 class NNetwork(nn.Module):
@@ -192,3 +198,4 @@ class NNetwork(nn.Module):
         q = self(state_t.unsqueeze[0])
         q_greedy = torch.argmax(q, dim=1)[0]
         action = q_greedy.detach().item()
+        return action

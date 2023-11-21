@@ -4,7 +4,7 @@ from gym import spaces
 from lunar_heist_env import LunarHeistEnv  
 # from Agents import QLearningAgent, DQNAgent  # Assume you complete the agents.py file
 import matplotlib.pyplot as plt
-from agents import QLearningAgent
+from agents import QLearningAgent, DQNAgent
 from icecream import ic
 import pandas as pd
 
@@ -27,11 +27,12 @@ def main():
     
     # TODO: Instantiate the QLearningAgent and DQNAgent here
     q_learning_agent = QLearningAgent(actions,alpha,gamma,min_epsilon,state_bins)  # Placeholder for student code
-    dqn_agent = None  # Placeholder for student code
+    dqn_agent = DQNAgent(env.observation_space.shape, actions.n, alpha, gamma)  # Placeholder for student code
+    batch_size = 128
+
+    # Initialize lists for detailed logs
     df_ql = pd.DataFrame(columns=['episode', 'steps', 'reward', 'minerals', 'mines'])
     df_dqn = pd.DataFrame(columns=['episode', 'steps', 'reward', 'minerals', 'mines'])
-    # Initialize lists for detailed logs
-    # ...
 
     # Training loop
     # ...
@@ -50,12 +51,22 @@ def main():
             # TODO: Choose an action using the QLearningAgent or DQNAgent
             #if step%2 == 0:
 
+            #q learning
             action = q_learning_agent.choose_action(state)  # Placeholder for student code
             # TODO: Take a step in the environment using the chosen action
             next_state, reward, done, info = env.step(action)  # Placeholder for student code
             # TODO: Update the QLearningAgent or DQNAgent with the new experience
             # Placeholder for student code
             q_learning_agent.update(state,action,reward,next_state,done)
+            
+            #dqn
+            action = dqn_agent.choose_action(state)
+            next_state, reward, done, info = env.step(action)
+            dqn_agent.remember(state, action, reward, next_state, done)
+            dqn_agent.add_step()
+            dqn_agent.replay(batch_size)
+
+
             state = next_state
             total_reward +=reward
 
