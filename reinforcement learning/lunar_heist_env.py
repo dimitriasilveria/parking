@@ -4,7 +4,7 @@ from gym import spaces
 from gym.utils import seeding
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-import pygame
+#import pygame
 import pandas as pd
 
 # The LunarHeist class will inherit from gym.Env and will need to implement the following methods:
@@ -92,7 +92,7 @@ class LunarHeistEnv(gym.Env):
         x += vx
         if abs(x) > 1:
             x = np.sign(x)*1
-        print(x)
+        #print(x)
         y = max(self.MIN_Y, y + vy)  # y should never be below the ground
         if y > 1:
             y = 1
@@ -143,14 +143,14 @@ class LunarHeistEnv(gym.Env):
 
         
         # Update the state
-        self.state = np.array([x, y, vx, vy], dtype=np.float32)
+        self.state = [x, y, vx, vy]
 
         info = {
             'mineral_collected': mineral_collected,
             'mine_hit': mine_hit,
         }
         
-        return np.array(self.state), reward, done, info
+        return self.state, reward, done, info
 
 
     # def render(self, mode='human'):

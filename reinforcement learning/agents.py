@@ -160,17 +160,16 @@ class DQNAgent(nn.Module):
         if batch_size > len(self.buffer_replay):
             return
         experience = random.sample(self.buffer_replay, batch_size)
-        state = np.asarray(exp[0] for exp in experience)
-        action = np.asarray(exp[1] for exp in experience)
-        reward = np.asarray(exp[2] for exp in experience)
-        next_state = np.asarray(exp[3] for exp in experience)
-        done = np.asarray(exp[4] for exp in experience)
-
-
-        state = torch.as_tensor(state, dtype = torch.float32).unsqueeze(-1)
+        state = np.asarray([exp[0] for exp in experience])
+        action = np.asarray([exp[1] for exp in experience])
+        reward = np.asarray([exp[2] for exp in experience])
+        next_state = np.asarray([exp[3] for exp in experience])
+        done = np.asarray([exp[4] for exp in experience])
+        test = [exp[0] for exp in experience]
+        state = torch.as_tensor(state,dtype = torch.float32)#.unsqueeze(-1)
         action = torch.as_tensor(action,dtype = torch.int64).unsqueeze(-1)
         reward = torch.as_tensor(reward,dtype = torch.float32).unsqueeze(-1)
-        next_state = torch.as_tensor(next_state, dtype = torch.float32).unsqueeze(-1)
+        next_state = torch.as_tensor(next_state, dtype = torch.float32)#.unsqueeze(-1)
         done = torch.as_tensor(done, dtype = torch.float32).unsqueeze(-1)
 
         target_qs = self.target_nn(next_state) #computes the target values for all the possible actions that lead to next_state
@@ -179,6 +178,7 @@ class DQNAgent(nn.Module):
 
         #optmizing the online network
         #loss computation
+        ic(state.shape)
         q = self.online_nn(state) #uses the online nn to estimate the taken action value
         q_action = torch.gather(input = q, dim=1,index = action)
         loss = nn.functional.smooth_l1_loss(q_action, q_target)

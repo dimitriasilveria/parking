@@ -23,12 +23,12 @@ def main():
     env = LunarHeistEnv()
     actions = env.action_space
     # TODO: Define the state_bins based on the observation space of the environment
-    bin_1 = np.round(np.arange(-1,1+0.1,0.1),1).tolist()
-    bin_2 = np.round(np.arange(0,1+0.1,0.1),1).tolist()
-    state_bins = [bin_1, bin_2,bin_1,bin_1]  # Placeholder for student code
+    #bin_1 = np.round(np.arange(-1,1+0.1,0.1),1).tolist()
+    #bin_2 = np.round(np.arange(0,1+0.1,0.1),1).tolist()
+    #state_bins = [bin_1, bin_2,bin_1,bin_1]  # Placeholder for student code
     
     # TODO: Instantiate the QLearningAgent and DQNAgent here
-    q_learning_agent = QLearningAgent(actions,alpha,gamma,min_epsilon,state_bins)  # Placeholder for student code
+    #q_learning_agent = QLearningAgent(actions,alpha,gamma,min_epsilon,state_bins)  # Placeholder for student code
     dqn_agent = DQNAgent(env.observation_space.shape[0], actions.n, alpha, gamma)  # Placeholder for student code
     batch_size = 128
 
@@ -67,6 +67,7 @@ def main():
             dqn_agent.remember(state, action, reward, next_state, done)
             dqn_agent.add_step()
             dqn_agent.replay(batch_size)
+            #ic(step)
 
 
             state = next_state
