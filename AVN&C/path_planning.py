@@ -74,10 +74,10 @@ class Path_Generator():
         # radius of the circle
 
         # center of the circle (x, y)
-        x0 = self.q_init[0] - 4
-        x1 = self.q_init[0] + 2
-        y0 = self.q_init[1] -2
-        y1 = self.q_init[1] +4
+        x0 = self.q_init[0] - 0.5
+        x1 = self.q_init[0] + 1
+        y0 = self.q_init[1] -1
+        y1 = self.q_init[1] +1
 
         x = x0 + random.random()*x1
         y = y0 + random.random() *y1
@@ -231,10 +231,10 @@ class Path_Generator():
             radius = 4
             self.first = True
             i = 1
-            for _ in range(N):
+            while 1:
                 print(i)
-                x_rand = self.random_points(x_last)               
-                x_new = self.cost(x_rand,x_last)
+                x_rand = self.random_points_box(x_last)               
+                x_new = x_rand #self.cost(x_rand,x_last)
                 #print(x_new,'x_new')
                 #print(self.obstacle(self.q_target,x_new))
                 if self.obstacle(x_new) == False or self.outside_box(x_new) == False:
@@ -312,23 +312,23 @@ class Path_Generator():
         for obstacle in self.obstacles:
             x,y=self.box(obstacle[0],obstacle[1])
             print(x,y)
-            plt.plot(x,y)
-        #plt.plot(X,Y)
+            #plt.plot(x,y)
+        plt.plot(X,Y)
         plt.plot(0,0, markersize=14)
 
         #plt.axis("off")
-        #plt.show()
+        plt.show()
 
 if __name__ == '__main__':
     L = 0.26
     W = 0.17
-    path_gen = Path_Generator(car_length=L,obst_tol=0,target_tol=0.1,radius=1)
+    path_gen = Path_Generator(car_length=L,obst_tol=0,target_tol=0.5,radius=1)
     obs_1 = [[-0.05,0],[0.05,0.25]]
     obs_2 = [[-0.05,-0.8],[0.05,-0.55]]
     obs_3 = [[obs_1[1][0]+W/2,obs_1[0][1]-L],[obs_1[1][0]+3/2*W,obs_1[0][1]]]
-    path_gen.set_obstacles(obs_1)
-    path_gen.set_obstacles(obs_2)
-    path_gen.set_obstacles(obs_3)
+    #path_gen.set_obstacles(obs_1)
+    #path_gen.set_obstacles(obs_2)
+    #path_gen.set_obstacles(obs_3)
     q_init = np.array([0.1,-1,np.pi/2,0])
     q_target = np.array([0,0.1,np.pi/2,0])
     #angles_i = np.array([]) #psi, phi

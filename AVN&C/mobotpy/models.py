@@ -774,11 +774,10 @@ class Articulated:
         The vehicle's track length [m].
     """
 
-    def __init__(self, ell_W_r, ell_T_r, ell_W_f, ell_T_f):
+    def __init__(self, ell_T_r, ell_T_f, ell_W):
         """Constructor method."""
-        self.ell_W_r = ell_W_r
+        self.ell_W = ell_W
         self.ell_T_r = ell_T_r
-        self.ell_W_f = ell_W_f
         self.ell_T_f = ell_T_f
 
     def f(self, x, u):
@@ -802,89 +801,49 @@ class Articulated:
         f[3] = u[1]
         return f
 
-    def uni2diff(self, u_in):
+    def draw(self, x, y, theta, phi):
+        """Finds points that draw a tricycle vehicle.
+
+        The centre of the rear wheel axle is (x, y), the body has orientation
+        theta, steering angle phi, wheelbase ell_W and track length ell_T.
+
+        Returns X_L, Y_L, X_R, Y_R, X_F, Y_F, X_B, Y_B, where L is for the left
+        wheel, R is for the right wheel, F is for the single front wheel, and
+        BD is for the vehicle's body.
         """
-        Convert speed and angular rate inputs to differential drive wheel speeds.
-
-        Parameters
-        ----------
-        u_in : ndarray of length 2
-            The speed and turning rate of the vehicle (v, omega).
-
-        Returns
-        -------
-        u_out : ndarray of length 2
-            The left and right wheel speeds (v_L, v_R).
-        """
-        v = u_in[0]
-        omega = u_in[1]
-        v_L = v - self.ell_W_f / 2 * omega
-        v_R = v + self.ell_W_f / 2 * omega
-        u_out = np.array([v_L, v_R])
-        return u_out
-
-
-    # def draw(self, x, y, theta, phi):
-    #     """Finds points that draw a tricycle vehicle.
-
-    #     The centre of the rear wheel axle is (x, y), the body has orientation
-    #     theta, steering angle phi, wheelbase ell_W and track length ell_T.
-
-    #     Returns X_L, Y_L, X_R, Y_R, X_F, Y_F, X_B, Y_B, where L is for the left
-    #     wheel, R is for the right wheel, F is for the single front wheel, and
-    #     BD is for the vehicle's body.
-    #     """
-    #     # Left and right front wheels
-    #     X_L, Y_L = graphics.draw_rectangle(
-    #         x - 0.5 * self.ell_T_f * np.sin(theta),
-    #         y + 0.5 * self.ell_T_f * np.cos(theta),
-    #         0.5 * self.ell_T_f,
-    #         0.25 * self.ell_T_f,
-    #         theta,
-    #     )
-    #     X_R, Y_R = graphics.draw_rectangle(
-    #         x + 0.5 * self.ell_T_f * np.sin(theta),
-    #         y - 0.5 * self.ell_T_f * np.cos(theta),
-    #         0.5 * self.ell_T_f,
-    #         0.25 * self.ell_T_f,
-    #         theta,
-    #     )
-    #     # Body front cart
-    #     X_BD, Y_BD = graphics.draw_rectangle(
-    #         x + self.ell_W_f / 2.0 * np.cos(theta),
-    #         y + self.ell_W_f / 2.0 * np.sin(theta),
-    #         2.0 * self.ell_W_f,
-    #         2.0 * self.ell_T_f,
-    #         theta,
-    #     )
-    #     x_r = x - self.ell_T_r*np.cos(theta-phi) - self.ell_T_f*np.cos(theta)
-    #     y_r = y - self.ell_T_r*np.sin(theta-phi) - self.ell_T_f*np.sin(theta)
-    #     # Left and right rear wheels
-    #     X_LR, Y_LR = graphics.draw_rectangle(
-    #         x_r - 0.5 * self.ell_T_r * np.sin(theta-phi),
-    #         y_r + 0.5 * self.ell_T_r * np.cos(theta-phi),
-    #         0.5 * self.ell_T_r,
-    #         0.25 * self.ell_T_r,
-    #         theta,
-    #     )
-    #     X_RR, Y_RR = graphics.draw_rectangle(
-    #         x_r + 0.5 * self.ell_T_r * np.sin(theta-phi),
-    #         y_r - 0.5 * self.ell_T_r * np.cos(theta-phi),
-    #         0.5 * self.ell_T_r,
-    #         0.25 * self.ell_T_r,
-    #         theta,
-    #     )
-    #     # Body rear cart
-    #     X_BDR, Y_BDR = graphics.draw_rectangle(
-    #         x_r + self.ell_W_r / 2.0 * np.cos(theta-phi),
-    #         y_r + self.ell_W_r / 2.0 * np.sin(theta-phi),
-    #         2.0 * self.ell_W_r,
-    #         2.0 * self.ell_T_r,
-    #         theta,
-    #     )
-
-    #     # Return the arrays of points
-    #     return X_L, Y_L, X_R, Y_R, X_BD, Y_BD, X_LR, Y_LR, X_RR, Y_RR, X_BDR, Y_BDR
+        # Left and right back wheels
+        X_L, Y_L = graphics.draw_rectangle(
+            x - 0.5 * self.ell_T_r * np.sin(theta),
+            y + 0.5 * self.ell_T_r * np.cos(theta),
+            0.5 * self.ell_T_r,
+            0.25 * self.ell_T_r,
+            theta,
+        )
+        X_R, Y_R = graphics.draw_rectangle(
+            x + 0.5 * self.ell_T_r * np.sin(theta),
+            y - 0.5 * self.ell_T_r * np.cos(theta),
+            0.5 * self.ell_T_r,
+            0.25 * self.ell_T_r,
+            theta,
+        )
+        # Front wheel
+        X_F, Y_F = graphics.draw_rectangle(
+            x + self.ell_W * np.cos(theta),
+            y + self.ell_W * np.sin(theta),
+            0.5 * self.ell_T_r,
+            0.25 * self.ell_T_r,
+            theta + phi,
+        )
+        # Body
+        X_BD, Y_BD = graphics.draw_rectangle(
+            x + self.ell_W / 2.0 * np.cos(theta),
+            y + self.ell_W / 2.0 * np.sin(theta),
+            2.0 * self.ell_W,
+            2.0 * self.ell_T_r,
+            theta,
+        )
+        # Return the arrays of points
+        return X_L, Y_L, X_R, Y_R, X_F, Y_F, X_BD, Y_BD
 
     def animate(
         self,

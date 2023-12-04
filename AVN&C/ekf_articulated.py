@@ -9,14 +9,16 @@ GitHub: https://github.com/botprof/agv-examples
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mobotpy.models import DiffDrive
+from matplotlib.patches import Circle
+from mobotpy.models import DiffDrive, Articulated
+from icecream import ic
 from mobotpy.integration import rk_four
 from scipy.stats import chi2
 from numpy.linalg import inv
 
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 30.0
-T = 0.01
+T = 0.04
 
 # Create an array of time values [s]
 t = np.arange(0.0, SIM_TIME, T)
@@ -30,18 +32,96 @@ ELL = 1.0
 
 # Create a vehicle object of type DiffDrive
 vehicle = DiffDrive(ELL)
+a = 1.975
+b = 3.850
+# VEHICLE SETUP
+ell_W_r = ell_W_f = a+b #vehicle width
+
+# Set the track length of the vehicle [m]
+ell_T_r = b
+ell_T_f = a
+# Create a vehicle object of type DiffDrive
+vehicle = Articulated(ell_T_r, ell_T_f, ell_W_f)
+# %%
+# BUILD A MAP OF FEATURES IN THE VEHICLE'S ENVIRONMENT
+
+# Number of transmitters
+M = 5
+
+# Map size [m]
+D_MAP = 20
+
+# Randomly place features in the map
+f_map = np.zeros((2, M))
+for i in range(0, M):
+    f_map[:, i] = D_MAP * (2.0 * np.random.rand(2) - 1.0)
 
 # %%
-# FUNCTION DEFINITIONS
+# SENSOR MODELS
+
+S_v = 0.025 #sigma of the speed sensor
+S_phi = 0.018 #sigma of the encoder
+
+#transmitters
+S_r = 0.23 #sigma
+alpha=12
+beta=0.03
+# Max and min transmitters ranges
+R_MAX = 15
+R_MIN = 1
+# Create a transmitter sensor model
+def transmitter_sensor(x, transm, R, alpha, beta):
+    #x is the vector with the vehicle coordinates
+    #transm is the vector with each transmitter's location
+    # Define how many total features are available
+    #m = np.shape(transm)[1]
 
 
-def unicycle_GNSS_ekf(u_m, y, Q, R, x, P, T):
+    m_k = np.shape(transm)[1]
+    y = np.zeros(m_k)
+
+        # Compute the range and bearing to all features (including sensor noise)
+    for i in range(0, m_k):
+        # Range measurement [m]
+        r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
+        y[i] = alpha*np.exp(-beta*r) + np.sqrt(R[0, 0]) * np.random.randn(1)
+        
+
+    # Return the range and bearing to features in y with indices in a
+    return y
+def transmitter_estimate(x, transm, alpha, beta):
+    #x is the vector with the vehicle coordinates
+    #transm is the vector with each transmitter's location
+    # Define how many total features are available
+    #m = np.shape(transm)[1]
+
+
+    m_k = np.shape(transm)[1]
+    y = np.zeros(m_k)
+
+        # Compute the range and bearing to all features (including sensor noise)
+    for i in range(0, m_k):
+        # Range measurement [m]
+        r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
+        y[i] = alpha*np.exp(-beta*r)
+
+    # Return the range and bearing to features in y with indices in a
+    return y
+def unicycle_GNSS_ekf(u_m, y, x_m,Q, R, x, P, T):
+    n = x.shape[0]
+    m = y.shape[0]
 
     # Define some matrices for the a priori step
-    G = np.array([[np.cos(x[2]), 0], [np.sin(x[2]), 0], [0, 1]])
-    F = np.identity(3) + T * np.array(
-        [[0, 0, -u_m[0] * np.sin(x[2])], [0, 0, u_m[0] * np.cos(x[2])], [0, 0, 0]]
-    )
+    G = np.array([[np.cos(x[2]), 0], [np.sin(x[2]), 0], 
+                   [np.sin(x[3])/(b+a*np.cos(x[3])), b/(b+a*np.cos(x[3]))], [0, 1]])
+    F = np.zeros((n,n))
+
+    C = (u_m[0]*b*np.cos(x[3]) 
+            + b*a*u_m[1]*np.sin(x[3]) + a*u_m[0])/(b+a*np.cos(x[3]))**2
+    F[0,2] = -u_m[0]*np.sin(x[2])
+    F[1,2] = u_m[0]*np.cos(x[2])
+    F[2,3] = C
+    F = np.identity(4) + T *F
     L = T * G
 
     # Compute a priori estimate
@@ -50,20 +130,24 @@ def unicycle_GNSS_ekf(u_m, y, Q, R, x, P, T):
 
     # Numerically help the covariance matrix stay symmetric
     P_new = (P_new + np.transpose(P_new)) / 2
-
+    H = np.zeros((m,n))
     # Define some matrices for the a posteriori step
-    C = np.array([[1, 0, 0], [0, 1, 0]])
-    H = C
-    M = np.identity(2)
+    for j in range(m):
+        di = np.sqrt((x_m[0,j]-x[0])**2 +(x_m[1,j]-x[1])**2)
+        exp = -alpha*beta*np.exp(-beta*di)/di
+        H[j,0] = -exp*(x_m[0,j]-x[0])
+        H[j,1] = -exp*(x_m[1,j]-x[1])
 
+    M = np.identity(m)
+    R = np.kron(np.identity(m), R)
     # Compute the a posteriori estimate
     K = (
         P_new
         @ np.transpose(H)
         @ inv(H @ P_new @ np.transpose(H) + M @ R @ np.transpose(M))
     )
-    x_new = x_new + K @ (y - C @ x_new)
-    P_new = (np.identity(3) - K @ H) @ P_new
+    x_new = x_new + K @ (y - transmitter_estimate(x,f_map,alpha,beta))
+    P_new = (np.identity(4) - K @ H) @ P_new
 
     # Numerically help the covariance matrix stay symmetric
     P_new = (P_new + np.transpose(P_new)) / 2
@@ -76,81 +160,71 @@ def unicycle_GNSS_ekf(u_m, y, Q, R, x, P, T):
 # SET UP INITIAL CONDITIONS AND ESTIMATOR PARAMETERS
 
 # Initial conditions
-x_init = np.zeros(3)
+x_init = np.zeros(4)
 x_init[0] = 0.0
 x_init[1] = 0.0
 x_init[2] = 0.0
 
 # Setup some arrays for the actual vehicle
-x = np.zeros((3, N))
+x = np.zeros((4, N))
 u = np.zeros((2, N))
 x[:, 0] = x_init
 
 # Set the initial guess for the estimator
-x_guess = x_init + np.array([5.0, -5.0, 0.1])
+x_guess = x_init + np.array([5.0, -5.0, 0.1,0.1])
 
 # Set the initial pose covariance estimate as a diagonal matrix
-P_guess = np.diag(np.square([5.0, -5.0, 0.1]))
+P_guess = np.diag(np.square([5.0, -5.0, 0.1,0.1]))
 
-# Set the true process and measurement noise covariances
-Q = np.diag(
-    [
-        1.0 / (np.power(T, 2)) * np.power(0.2 * np.pi / ((2 ** 12) * 3), 2),
-        np.power(0.001, 2),
-    ]
-)
-R = np.power(5.0, 2) * np.identity(2)
-
+# Set the covariance matrices
+Q = np.diag([S_v ** 2, 2*S_phi ** 2/T**2])
+# Set the covariance matrices
+#Q = np.diag([SIGMA_SPEED ** 2, SIGMA_SPEED ** 2])
+R = np.diag([S_r ** 2])
 # Initialized estimator arrays
-x_hat = np.zeros((3, N))
+x_hat = np.zeros((4, N))
 x_hat[:, 0] = x_guess
 
 # Measured odometry (speed and angular rate) and GNSS (x, y) signals
 u_m = np.zeros((2, N))
-y = np.zeros((2, N))
+#y = np.zeros((M, N))
 
 # Covariance of the estimate
-P_hat = np.zeros((3, 3, N))
+P_hat = np.zeros((4, 4, N))
 P_hat[:, :, 0] = P_guess
 
 # Compute some inputs to just drive around
 for k in range(1, N):
     # Compute some inputs to steer the unicycle around
-    u_unicycle = np.array([2.0, np.sin(0.005 * T * k)])
+    u = np.array([2.0, np.sin(0.005 * T * k)])
 
 # %%
 # SIMULATE AND PLOT WITHOUT GNSS
 
 # Set the process and measurement noise covariances to ignore GNSS
 Q_hat = Q
-R_hat = 1e10 * R
+R_hat = R
 
 for k in range(1, N):
-
+    
+    u = np.array([2.0, 0.1])
     # Simulate the differential drive vehicle's motion
-    u[:, k] = vehicle.uni2diff(u_unicycle)
-    x[:, k] = rk_four(vehicle.f, x[:, k - 1], u[:, k - 1], T)
+    x[:, k] = rk_four(vehicle.f, x[:, k - 1], u, T)
+    #x[:, k] = rk_four(vehicle.f, x[:, k - 1], u[:, k - 1], T)
 
     # Simulate the vehicle speed estimate
-    u_m[0, k] = u_unicycle[0] + np.power(Q[0, 0], 0.5) * np.random.randn(1)
+    u_m[0, k] = u[0] + np.power(Q[0, 0], 0.5) * np.random.randn(1)
 
     # Simulate the angular rate gyroscope measurement
-    u_m[1, k] = u_unicycle[1] + np.power(Q[1, 1], 0.5) * np.random.randn(1)
+    u_m[1, k] = u[1] + np.power(Q[1, 1], 0.5) * np.random.randn(1)
 
     # Simulate the GNSS measurement
-    y[0, k] = x[0, k] + np.power(R[0, 0], 0.5) * np.random.randn(1)
-    y[1, k] = x[1, k] + np.power(R[1, 1], 0.5) * np.random.randn(1)
+    y =  transmitter_sensor(x[:, k],f_map,R,alpha,beta)
 
     # Run the EKF estimator
     x_hat[:, k], P_hat[:, :, k] = unicycle_GNSS_ekf(
-        u_m[:, k], y[:, k], Q_hat, R_hat, x_hat[:, k - 1], P_hat[:, :, k - 1], T
+        u_m[:, k], y, f_map, Q_hat, R_hat, x_hat[:, k - 1], P_hat[:, :, k - 1], T
     )
-
-# Change some plot settings (optional)
-plt.rc("text", usetex=True)
-plt.rc("text.latex", preamble=r"\usepackage{cmbright,amsmath,bm}")
-plt.rc("savefig", format="pdf")
-plt.rc("savefig", bbox="tight")
 
 # Plot results without GNSS
 fig1 = plt.figure(1)
@@ -175,7 +249,7 @@ plt.ylabel(r"$x_3$ [rad]")
 plt.grid(color="0.95")
 
 # Save the plot
-plt.savefig("../agv-book/figs/ch5/diffdrive_GNSS_EKF_fig1.pdf")
+##plt.savefig("../agv-book/figs/ch5/diffdrive_GNSS_EKF_fig1.pdf")
 
 # Find the scaling factor for plotting 99% covariance bounds
 alpha = 0.01
@@ -183,9 +257,9 @@ s1 = chi2.isf(alpha, 1)
 s2 = chi2.isf(alpha, 2)
 
 # Plot the estimation error with covariance bounds
-sigma = np.zeros((3, N))
+sigma = np.zeros((4, N))
 fig2 = plt.figure(2)
-ax1 = plt.subplot(311)
+ax1 = plt.subplot(411)
 sigma[0, :] = np.sqrt(s1 * P_hat[0, 0, :])
 plt.fill_between(
     t,
@@ -200,7 +274,7 @@ plt.ylabel(r"$e_1$ [m]")
 plt.setp(ax1, xticklabels=[])
 plt.grid(color="0.95")
 plt.legend()
-ax2 = plt.subplot(312)
+ax2 = plt.subplot(412)
 sigma[1, :] = np.sqrt(s1 * P_hat[1, 1, :])
 plt.fill_between(
     t,
@@ -214,7 +288,7 @@ plt.plot(t, x[1, :] - x_hat[1, :], "C0", label="Error")
 plt.ylabel(r"$e_2$ [m]")
 plt.setp(ax2, xticklabels=[])
 plt.grid(color="0.95")
-ax3 = plt.subplot(313)
+ax3 = plt.subplot(413)
 sigma[2, :] = np.sqrt(s1 * P_hat[2, 2, :])
 plt.fill_between(
     t,
@@ -228,9 +302,22 @@ plt.plot(t, x[2, :] - x_hat[2, :], "C0", label="Error")
 plt.ylabel(r"$e_3$ [rad]")
 plt.xlabel(r"$t$ [s]")
 plt.grid(color="0.95")
-
+ax3 = plt.subplot(414)
+sigma[3, :] = np.sqrt(s1 * P_hat[3, 3, :])
+plt.fill_between(
+    t,
+    -sigma[2, :],
+    sigma[2, :],
+    color="C0",
+    alpha=0.2,
+    label=str(100 * (1 - alpha)) + " \% Confidence",
+)
+plt.plot(t, x[3, :] - x_hat[3, :], "C0", label="Error")
+plt.ylabel(r"$e_3$ [rad]")
+plt.xlabel(r"$t$ [s]")
+plt.grid(color="0.95")
 # Save the plot
-plt.savefig("../agv-book/figs/ch5/diffdrive_GNSS_EKF_fig2.pdf")
+#plt.savefig("../agv-book/figs/ch5/diffdrive_GNSS_EKF_fig2.pdf")
 
 # Show the plots to the screen
 plt.show()
@@ -238,23 +325,20 @@ plt.show()
 # %%
 # PLOT THE NOISY GNSS DATA
 
-fig3 = plt.figure(3)
-ax1 = plt.subplot(211)
-plt.plot(t, y[0, :], "C1", label="GNSS measurement")
-plt.plot(t, x[0, :], "C0", label="Actual")
-plt.ylabel(r"$x_1$ [m]")
-plt.grid(color="0.95")
-plt.setp(ax1, xticklabels=[])
-plt.legend()
-ax2 = plt.subplot(212)
-plt.plot(t, y[1, :], "C1", label="GNSS measurement")
-plt.plot(t, x[1, :], "C0", label="Actual")
+# Plot the actual versus estimated positions on the map
+fig3, ax = plt.subplots()
+circle = Circle(x[0:2, 0], radius=R_MAX, alpha=0.2, color="C0", label="Sensing range")
+ax.add_artist(circle)
+plt.plot(x[0, :], x[1, :], "C0", label="Actual")
+plt.plot(x_hat[0, :], x_hat[1, :], "C1--", label="Estimated")
+plt.plot(f_map[0, :], f_map[1, :], "C2*", label="Transmitter")
+plt.axis("equal")
+ax.set_xlim([np.min(x_hat[0, :]) - 10, np.max(x_hat[0, :]) + 10])
+ax.set_ylim([np.min(x_hat[1, :]) - 10, np.max(x_hat[1, :]) + 10])
+plt.xlabel(r"$x_1$ [m]")
 plt.ylabel(r"$x_2$ [m]")
-plt.xlabel(r"$t$ [s]")
 plt.grid(color="0.95")
-
-# Save the plot
-plt.savefig("../agv-book/figs/ch5/diffdrive_GNSS_EKF_fig3.pdf")
+plt.legend()
 
 # Show the plots to the screen
 plt.show()

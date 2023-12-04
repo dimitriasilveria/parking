@@ -46,7 +46,7 @@ vehicle = Articulated(ell_W_r, ell_T_r, ell_W_f, ell_T_f)
 # BUILD A MAP OF FEATURES IN THE VEHICLE'S ENVIRONMENT
 
 # Number of features
-M = 3
+M = 5
 
 # Map size [m]
 D_MAP = 10
@@ -59,69 +59,18 @@ for i in range(0, M):
 # %%
 # SENSOR MODELS
 
-# Uncertainty in wheel speeds [m/s]
-SIGMA_SPEED = 0.1
+# SENSOR MODELS
 
-# Max and min sensor ranges
+S_v = 0.025 #sigma of the speed sensor
+S_phi = 0.018 #sigma of the encoder
+
+#transmitters
+S_r = 0.23 #sigma
+alpha=12
+beta=0.03
+# Max and min transmitters ranges
 R_MAX = 15
 R_MIN = 1
-
-# Set the range [m] and bearing [rad] uncertainty
-SIGMA_RANGE = 0.3
-SIGMA_BEARING = 15 * np.pi / 180
-
-# Create a range and bearing sensor model
-def RandB_sensor(x, f_map, R):
-
-    # Define how many total features are available
-    m = np.shape(f_map)[1]
-
-    # Find the indices of features that are within range [r_min, r_max]
-    a = np.array([])
-    for i in range(0, m):
-        r = np.sqrt((f_map[0, i] - x[0]) ** 2 + (f_map[1, i] - x[1]) ** 2)
-        if np.all(
-            [
-                r < R_MAX,
-                r > R_MIN,
-            ]
-        ):
-            a = np.append(a, i)
-
-    # Compute the range and bearing to all features within range
-    if np.shape(a)[0] > 0:
-        # Specify the size of the output
-        m_k = np.shape(a)[0]
-        y = np.zeros(2 * m_k)
-
-        # Compute the range and bearing to all features (including sensor noise)
-        for i in range(0, m_k):
-            # Range measurement [m]
-            y[2 * i] = np.sqrt(
-                (f_map[0, int(a[i])] - x[0]) ** 2 + (f_map[1, int(a[i])] - x[1]) ** 2
-            ) + np.sqrt(R[0, 0]) * np.random.randn(1)
-            # Bearing measurement [rad]
-            y[2 * i + 1] = (
-                np.unwrap(
-                    np.array(
-                        [
-                            np.arctan2(
-                                f_map[1, int(a[i])] - x[1], f_map[0, int(a[i])] - x[0]
-                            )
-                            - x[2]
-                        ]
-                    )
-                )
-                - np.pi
-                + np.sqrt(R[1, 1]) * np.random.randn(1)
-            )
-    else:
-        # No features were found within the sensing range
-        y = np.array([])
-
-    # Return the range and bearing to features in y with indices in a
-    return y, a
-
 # Create a range and bearing sensor model
 def transmitter_sensor(x, transm, R, alpha, beta):
     #x is the vector with the vehicle coordinates
@@ -130,15 +79,17 @@ def transmitter_sensor(x, transm, R, alpha, beta):
     #m = np.shape(transm)[1]
 
 
-    m_k = np.shape(transm)[1]
+    m_k = np.shape(transm)[1] + 2
     y = np.zeros(m_k)
 
         # Compute the range and bearing to all features (including sensor noise)
-    for i in range(0, m_k):
+    for i in range(0, m_k-2):
         # Range measurement [m]
         r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
         y[i] = alpha*np.exp(-beta*r) + np.sqrt(R[0, 0]) * np.random.randn(1)
 
+    y[m_k-2] = x[2] + np.sqrt(R[-2, -2]) * np.random.randn(1)
+    y[m_k-1] = x[3] + np.sqrt(R[-1, -1]) * np.random.randn(1)
     # Return the range and bearing to features in y with indices in a
     return y
 
@@ -182,7 +133,7 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
     P_hat = P_xi[0:n_x, 0:n_x]
 
     # Find the number of observed features
-    m_k = np.shape(f_map)[1]
+    m_k = np.shape(f_map)[1] + 2
 
     # Compute a new set of sigma points using the latest x_hat and P_hat
     x_sig = np.zeros((n_x, 2 * n_x + 1))
@@ -195,13 +146,14 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
     y_hat_sig = np.zeros((m_k, 2 * n_x + 1))
     for j in range(0, 2 * n_x + 1):
         # Compute the expected measurements
-        for i in range(0, m_k):
+        for i in range(0, m_k-2):
             r = np.sqrt(
                 (f_map[0, i] - x_sig[0, j]) ** 2
                 + (f_map[1, i] - x_sig[1, j]) ** 2
             )
             y_hat_sig[i, j] = alpha*np.exp(-beta*r)
-            
+        y_hat_sig[m_k-2,j] =  x_sig[2, j] 
+        y_hat_sig[m_k-1,j] =  x_sig[3, j]   
     # Recombine the sigma points
     w_x = 0.5 / (n_x + kappa) * np.ones(2 * n_x + 1)
     w_x[0] = 2 * kappa * w_x[0]
@@ -217,7 +169,7 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
         P_xy = P_xy + w_x[i] * (x_diff.reshape((n_x, 1))) @ np.transpose(
             y_diff.reshape(( m_k, 1))
         )
-    P_y = P_y + np.kron(np.identity(m_k), R)
+    P_y = P_y + R#np.kron(np.identity(m_k), R)
 
     # Help to keep the covariance matrix symmetrical
     P_y = (P_y + np.transpose(P_y)) / 2
@@ -235,21 +187,17 @@ def UKF(x, P, v_m, y_m, f_map, Q, R, kappa,alpha,beta):
 
 # %%
 # SIMULATE THE SYSTEM
-# SIMULATE THE SYSTEM
-S_v = 0.025
-S_phi = 0.018
-S_r = 0.23
-# Number of transmitters
 
-#sensors
-alpha=12
-beta=0.03
-#m = 2 #number of transmitters
 # Set the covariance matrices
 Q = np.diag([S_v ** 2, 2*S_phi ** 2/T**2])
 # Set the covariance matrices
 #Q = np.diag([SIGMA_SPEED ** 2, SIGMA_SPEED ** 2])
-R = np.diag([S_r ** 2])
+R = np.eye(M+2)
+R = S_r ** 2*R
+R[-2,-2] = S_phi ** 2
+R[-1,-1] = S_phi ** 2
+#ic(R)
+#R = np.diag([S_r ** 2, S_theta ** 2])
 
 # Initialize state, input, and estimator variables
 x = np.zeros((4, N))
@@ -275,11 +223,8 @@ KAPPA = 4 - np.shape(x)[0]
 for i in range(1, N):
 
     # Compute some inputs (i.e., drive around)
-    if i < N/2:
-        v = np.array([1, 0.])
-    else:
-        v = np.array([1, -0.])
 
+    v = np.array([1, 0])
     # Run the vehicle motion model
     x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
 
@@ -307,16 +252,18 @@ for i in range(1, N):
 #function to check observability during the whole trajetory
 def check_observability(x, u,x_m):
     n = np.shape(x)[0]
-    m = np.shape(x_m)[1]
+    m = np.shape(x_m)[1]+2
     H = np.zeros((m,n))
     F = np.zeros((n,n))
+    O = np.zeros((n*m,n))
     for i in range(N):
-        for j in range(m):
+        for j in range(m-2):
             di = np.sqrt((x_m[0,j]-x[0,i])**2 +(x_m[1,j]-x[1,i])**2)
             exp = -alpha*beta*np.exp(-beta*di)/di
             H[j,0] = -exp*(x_m[0,j]-x[0,i])
             H[j,1] = -exp*(x_m[1,j]-x[1,i])
-
+        H[m-2,2] = 1
+        H[m-1,3] = 1 
         C = (u[0, i]*b*np.cos(x[3,i]) 
                 + b*a*u[1,i]*np.sin(x[3,i]) + a*u[0,i])/(b+a*np.cos(x[3,i]))**2
         F[0,2] = -u[0,i]*np.sin(x[2,i])
@@ -338,10 +285,10 @@ s1 = chi2.isf(alpha, 1)
 s2 = chi2.isf(alpha, 2)
 
 # Set some plot limits for better viewing
-x_range = 15
-y_range = 15
-theta_range = 1
-phi_range = 1
+x_range = 2
+y_range = 2
+theta_range = 0.5
+phi_range = 0.5
 
 # Plot the errors with covariance bounds
 sigma = np.zeros((4, N))
@@ -377,7 +324,7 @@ plt.fill_between(t, -sigma[3, :], sigma[3, :], color="C0", alpha=0.2)
 plt.plot(t, x[3, :] - x_hat_UKF[3, :], "C0")
 plt.ylabel(r"$\phi$ [rad]")
 plt.setp(ax3, xticklabels=[])
-ax3.set_ylim([-theta_range, theta_range])
+ax4.set_ylim([-phi_range, phi_range])
 plt.xlabel(r"$t$ [s]")
 plt.grid(color="0.95")
 # Plot the actual versus estimated positions on the map
@@ -397,4 +344,3 @@ plt.legend()
 
 # Show the plot to the screen
 plt.show()
-

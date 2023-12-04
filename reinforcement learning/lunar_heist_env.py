@@ -143,6 +143,10 @@ class LunarHeistEnv(gym.Env):
 
         
         # Update the state
+        x = np.clip(x,-1,1)
+        vx = np.clip(vx,-1,1)
+        vy = np.clip(vy,-1,1)
+        y = np.clip(y,0,1)
         self.state = [x, y, vx, vy]
 
         info = {
