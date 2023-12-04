@@ -33,7 +33,7 @@ ell_W_r = ell_W_f = 1.0 #vehicle width
 ell_T_r = b
 ell_T_f = a
 # Create a vehicle object of type DiffDrive
-vehicle = Articulated(ell_T_r, ell_T_f,ell_W_r)
+vehicle = Articulated(ell_T_r, ell_T_f, ell_W_f)
 
 # SENSOR MODELS
 
@@ -134,16 +134,15 @@ def transmitter_sensor(x, transm, R):
     alpha=12
     beta=0.03
 
-    m_k = np.shape(transm)[1] + 1
+    m_k = np.shape(transm)[1]
     y = np.zeros(m_k)
 
         # Compute the range and bearing to all features (including sensor noise)
-    for i in range(0, m_k-1):
+    for i in range(0, m_k):
         # Range measurement [m]
         r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
         y[i] = alpha*np.exp(-beta*r) + np.sqrt(R[0, 0]) * np.random.randn(1)
         
-    y[m_k-1] = x[3] + np.sqrt(R[-1, -1]) * np.random.randn(1)
     # Return the range and bearing to features in y with indices in a
     return y
 def h(x, transm):
@@ -154,15 +153,15 @@ def h(x, transm):
 
     alpha=12
     beta=0.03
-    m_k = np.shape(transm)[1] + 1
+    m_k = np.shape(transm)[1]
     y = np.zeros(m_k)
 
         # Compute the range and bearing to all features (including sensor noise)
-    for i in range(0, m_k-1):
+    for i in range(0, m_k):
         # Range measurement [m]
         r = np.sqrt((transm[0, i] - x[0]) ** 2 + (transm[1, i] - x[1]) ** 2)
         y[i] = alpha*np.exp(-beta*r)
-    y[m_k-1] = x[3]
+
     # Return the range and bearing to features in y with indices in a
     return y
 
@@ -262,9 +261,8 @@ R_MAX = 25.0
 R_MIN = 1.0
 
 # Set the range and bearing covariance
-R = np.eye(M+1)
+R = np.eye(M)
 R = SIGMA_TRANSM ** 2*R
-R[-1,-1] = SIGMA_PHI ** 2
 #R = np.diag([SIGMA_TRANSM**2])
 
 # Initialize the first particles on the basis of the initial uncertainty
