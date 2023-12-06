@@ -53,7 +53,7 @@ M = 1000
 x_pf = np.zeros((4, M, N))
 
 # Set the covariance matrices
-Q = np.diag([SIGMA_SPEED**2, 2*SIGMA_SPEED**2/T**2])
+Q = np.diag([SIGMA_SPEED**2, 2*SIGMA_PHI**2/T**2])
 # Initialize the vehicle's true state
 x = np.zeros((4, N))
 
@@ -64,44 +64,44 @@ x_hat = np.zeros((4, N))
 P_hat = np.zeros((4, 4, N))
 
 # Set the initial process covariance
-P_hat[:, :, 0] = np.diag(np.square([0.1, 0.1, 0.01, 0.01]))
+P_hat[:, :, 0] = np.diag(np.square([5.0, 5.0, 3.5, 3.5]))
 
 # Initialize the first particles on the basis of the initial uncertainty
 for i in range(1, M):
     x_pf[:, i, 0] = x_hat[:, 0] + np.sqrt(P_hat[:, :, 0]) @ np.random.standard_normal(4)
 
-# Initialize the first particles on a uniform distribution over the space
-# for i in range(1, M):
-#     x_pf[:, i, 0] = 100 * np.random.uniform(-1, 1, 3)
+#Initialize the first particles on a uniform distribution over the space
+for i in range(1, M):
+    x_pf[:, i, 0] = 100 * np.random.uniform(-1, 1, 4)
 
-#for i in range(1, N):
-#
-#    # Compute some inputs (i.e., drive around)
-#    v = np.array([3.95, 4.05])
-#
-#    # Run the vehicle motion model
-#    x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
-#
-#    # Propagate each particle through the motion model
-#    for j in range(0, M):
-#
-#        # Model the proprioceptive sensors (i.e., speed and turning rate)
-#        v_m = v + np.sqrt(Q) @ np.random.standard_normal(2)
-#
-#        # Propagate each particle
-#        x_pf[:, j, i] = rk_four(vehicle.f, x_pf[:, j, i - 1], v_m, T)
+for i in range(1, N):
 
-## Plot the results of the dead reckoning example
-#plt.figure(1)
-#plt.plot(x_pf[0, :, 0], x_pf[1, :, 0], ".", label="Particles", alpha=0.2)
-#for k in range(1, N, 1):
-#    plt.plot(x_pf[0, :, k], x_pf[1, :, k], ".", alpha=0.2)
-#plt.plot(x[0, :], x[1, :], "C0", label="Actual path")
-#plt.axis("equal")
-#plt.xlabel("$x$ [m]")
-#plt.ylabel("$y$ [m]")
-#plt.legend()
-#plt.show()
+    # Compute some inputs (i.e., drive around)
+    v = np.array([0.1, -0.01])
+
+    # Run the vehicle motion model
+    x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
+
+    # Propagate each particle through the motion model
+    for j in range(0, M):
+
+        # Model the proprioceptive sensors (i.e., speed and turning rate)
+        v_m = v + np.sqrt(Q) @ np.random.standard_normal(2)
+
+        # Propagate each particle
+        x_pf[:, j, i] = rk_four(vehicle.f, x_pf[:, j, i - 1], v_m, T)
+
+# Plot the results of the dead reckoning example
+plt.figure(1)
+plt.plot(x_pf[0, :, 0], x_pf[1, :, 0], ".", label="Particles", alpha=0.2)
+for k in range(1, N, 1):
+    plt.plot(x_pf[0, :, k], x_pf[1, :, k], ".", alpha=0.2)
+plt.plot(x[0, :], x[1, :], "C0", label="Actual path")
+plt.axis("equal")
+plt.xlabel("$x$ [m]")
+plt.ylabel("$y$ [m]")
+plt.legend()
+plt.show()
 
 # %%
 # BUILD A MAP OF TRANSMITTERS IN THE VEHICLE'S ENVIRONMENT
@@ -251,10 +251,10 @@ P_hat = np.zeros((4, 4, N))
 x_hat[:, 0] = x[:, 0] + np.array([0, 5.0, 0.1, 0.1])
 
 # Set some initial conditions
-P_hat[:, :, 0] = np.diag(np.square([5.0, 5.0, 0.1, 0.1]))
+P_hat[:, :, 0] = np.diag(np.square([5.0, 5.0, 3.5, 3.5]))
 
 # Set the covariance matrices
-Q = np.diag([SIGMA_SPEED**2, 2*SIGMA_SPEED**2/T**2])
+Q = np.diag([SIGMA_SPEED**2, 2*SIGMA_PHI**2/T**2])
 
 # Set sensor range
 R_MAX = 25.0

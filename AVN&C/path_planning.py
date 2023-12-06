@@ -221,7 +221,8 @@ class Path_Generator():
                 (0, {'qx':[self.q_init[0]],
                      'qy': [self.q_init[1]],
                     'qpsi':[self.q_init[2]],
-                     'qphi': [self.q_init[3]] })
+                     'qphi': [self.q_init[3]],
+                     'cost' : 0 })
             ])
 
             #print(list(self.G.nodes[0]['q']))
@@ -237,10 +238,13 @@ class Path_Generator():
                 x_new = x_rand #self.cost(x_rand,x_last)
                 #print(x_new,'x_new')
                 #print(self.obstacle(self.q_target,x_new))
-                if self.obstacle(x_new) == False or self.outside_box(x_new) == False:
+                if self.obstacle(x_new) == False:# or self.outside_box(x_new) == False:
 
-                    nearest = self.search_nearest(x_new)
-                    x_nearest = [self.G.nodes[nearest]['qx'][-1],self.G.nodes[nearest]['qy'][-1],self.G.nodes[nearest]['qpsi'][-1],self.G.nodes[nearest]['qphi'][-1]]
+                    nearest = self.search_nearest(x_rand)
+                    
+                    x_nearest = [self.G.nodes[nearest]['qx'][-1],
+                                 self.G.nodes[nearest]['qy'][-1],self.G.nodes[nearest]['qpsi'][-1],self.G.nodes[nearest]['qphi'][-1],self.G.nodes[nearest]['cost']]
+                    x_best = self.cost(x_rand,x_nearest)
                     X_new, Y_new, Psi,Phi = self.kinematics(dt,x_nearest[0:2],x_new,x_nearest[2],x_nearest[3],self.v)
                     #print(Phi[-1],'phi')
                     if any(X_new) == True:
