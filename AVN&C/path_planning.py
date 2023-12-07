@@ -78,7 +78,7 @@ class Path_Generator():
         x1 = self.q_init[0] + 1
         y0 = self.q_init[1] -1
         y1 = self.q_init[1] +1
-
+        #print(x0,x1,y0,y1)
         x = x0 + random.random()*x1
         y = y0 + random.random() *y1
         
@@ -158,7 +158,7 @@ class Path_Generator():
         Phi = []
         #h = 0.01
         t = 0
-        while (abs(x - xf[0]) > tol or abs(y-xf[1])> tol ) and t<5: #and self.obstacle([x,y]) == False:
+        while (abs(x - xf[0]) > tol or abs(y-xf[1])> tol ) and t<1: #and self.obstacle([x,y]) == False:
             #print(i)
             m = np.arctan2(xf[1]-y,xf[0]-x)
             
@@ -210,6 +210,8 @@ class Path_Generator():
     def generate_path(self,q_init,q_target,N,v,w):
         self.q_target = q_target
         self.q_init = q_init
+        plt.scatter(q_init[0],q_init[1])
+        plt.scatter(q_target[0],q_target[1])
         self.v = v
         self.W = w
         dt = 1/50
@@ -221,8 +223,8 @@ class Path_Generator():
                 (0, {'qx':[self.q_init[0]],
                      'qy': [self.q_init[1]],
                     'qpsi':[self.q_init[2]],
-                     'qphi': [self.q_init[3]],
-                     'cost' : 0 })
+                     'qphi': [self.q_init[3]]})#,
+                     #'cost' : 0 })
             ])
 
             #print(list(self.G.nodes[0]['q']))
@@ -243,7 +245,7 @@ class Path_Generator():
                     nearest = self.search_nearest(x_rand)
                     
                     x_nearest = [self.G.nodes[nearest]['qx'][-1],
-                                 self.G.nodes[nearest]['qy'][-1],self.G.nodes[nearest]['qpsi'][-1],self.G.nodes[nearest]['qphi'][-1],self.G.nodes[nearest]['cost']]
+                                 self.G.nodes[nearest]['qy'][-1],self.G.nodes[nearest]['qpsi'][-1],self.G.nodes[nearest]['qphi'][-1]]#,self.G.nodes[nearest]['cost']]
                     x_best = self.cost(x_rand,x_nearest)
                     X_new, Y_new, Psi,Phi = self.kinematics(dt,x_nearest[0:2],x_new,x_nearest[2],x_nearest[3],self.v)
                     #print(Phi[-1],'phi')
@@ -259,6 +261,20 @@ class Path_Generator():
                         ])
 
                         self.G.add_edge(nearest,i)
+                        pos = {node: [self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1]] for node in self.G.nodes}
+
+                        # options = {
+                        #     "font_size": 20,
+                        #     "node_size": 500,
+                        #     "node_color": "white",
+                        #     "edgecolors": "black",
+                        #     "linewidths": 5,
+                        #     "width": 5,
+                        # }
+                        nx.draw_networkx(self.G, pos)
+                        #nx.draw(self.G)
+                        plt.draw()
+                        plt.pause(0.01) 
                         self.first = False
                         i +=1
                         if abs(x_last[0] -self.q_target[0])  <= self.target_tol  and abs(x_last[1] -self.q_target[1])  <= self.target_tol and abs(x_last[2] -self.q_target[2])  <= self.target_tol:
@@ -327,13 +343,13 @@ if __name__ == '__main__':
     L = 0.26
     W = 0.17
     path_gen = Path_Generator(car_length=L,obst_tol=0,target_tol=0.5,radius=1)
-    obs_1 = [[-0.05,0],[0.05,0.25]]
-    obs_2 = [[-0.05,-0.8],[0.05,-0.55]]
-    obs_3 = [[obs_1[1][0]+W/2,obs_1[0][1]-L],[obs_1[1][0]+3/2*W,obs_1[0][1]]]
+    #obs_1 = [[-0.05,0],[0.05,0.25]]
+    #obs_2 = [[-0.05,-0.8],[0.05,-0.55]]
+    #obs_3 = [[obs_1[1][0]+W/2,obs_1[0][1]-L],[obs_1[1][0]+3/2*W,obs_1[0][1]]]
     #path_gen.set_obstacles(obs_1)
     #path_gen.set_obstacles(obs_2)
     #path_gen.set_obstacles(obs_3)
-    q_init = np.array([0.1,-1,np.pi/2,0])
+    q_init = np.array([0.1,-0.8,np.pi/2,0])
     q_target = np.array([0,0.1,np.pi/2,0])
     #angles_i = np.array([]) #psi, phi
     #angles_f = np.array([])

@@ -15,7 +15,7 @@ from scipy.stats import chi2
 
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 30.0
-T = 0.04
+T = 0.05
 
 # Create an array of time values [s]
 t = np.arange(0.0, SIM_TIME, T)
@@ -47,7 +47,7 @@ SIGMA_TRANSM = 0.23
 # DEAD RECKONING EXAMPLE
 
 # Set the number of particles to use
-M = 1000
+M = 200
 
 # Create an array of particles for each time index
 x_pf = np.zeros((4, M, N))
@@ -73,48 +73,48 @@ for i in range(1, M):
 #Initialize the first particles on a uniform distribution over the space
 for i in range(1, M):
     x_pf[:, i, 0] = 100 * np.random.uniform(-1, 1, 4)
-
-for i in range(1, N):
-
-    # Compute some inputs (i.e., drive around)
-    v = np.array([0.1, -0.01])
-
-    # Run the vehicle motion model
-    x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
-
-    # Propagate each particle through the motion model
-    for j in range(0, M):
-
-        # Model the proprioceptive sensors (i.e., speed and turning rate)
-        v_m = v + np.sqrt(Q) @ np.random.standard_normal(2)
-
-        # Propagate each particle
-        x_pf[:, j, i] = rk_four(vehicle.f, x_pf[:, j, i - 1], v_m, T)
-
-# Plot the results of the dead reckoning example
-plt.figure(1)
-plt.plot(x_pf[0, :, 0], x_pf[1, :, 0], ".", label="Particles", alpha=0.2)
-for k in range(1, N, 1):
-    plt.plot(x_pf[0, :, k], x_pf[1, :, k], ".", alpha=0.2)
-plt.plot(x[0, :], x[1, :], "C0", label="Actual path")
-plt.axis("equal")
-plt.xlabel("$x$ [m]")
-plt.ylabel("$y$ [m]")
-plt.legend()
-plt.show()
+#
+#for i in range(1, N):
+#
+#    # Compute some inputs (i.e., drive around)
+#    v = np.array([0.1, -0.01])
+#
+#    # Run the vehicle motion model
+#    x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
+#
+#    # Propagate each particle through the motion model
+#    for j in range(0, M):
+#
+#        # Model the proprioceptive sensors (i.e., speed and turning rate)
+#        v_m = v + np.sqrt(Q) @ np.random.standard_normal(2)
+#
+#        # Propagate each particle
+#        x_pf[:, j, i] = rk_four(vehicle.f, x_pf[:, j, i - 1], v_m, T)
+#
+## Plot the results of the dead reckoning example
+#plt.figure(1)
+#plt.plot(x_pf[0, :, 0], x_pf[1, :, 0], ".", label="Particles", alpha=0.2)
+#for k in range(1, N, 1):
+#    plt.plot(x_pf[0, :, k], x_pf[1, :, k], ".", alpha=0.2)
+#plt.plot(x[0, :], x[1, :], "C0", label="Actual path")
+#plt.axis("equal")
+#plt.xlabel("$x$ [m]")
+#plt.ylabel("$y$ [m]")
+#plt.legend()
+#plt.show()
 
 # %%
 # BUILD A MAP OF TRANSMITTERS IN THE VEHICLE'S ENVIRONMENT
 
 # Number of transmitters
-M = 20
+m = 50
 
 # Map size [m]
-D_MAP = 5
+D_MAP = 50
 
 # Randomly place features in the map
-f_map = np.zeros((2, M))
-for i in range(0, M):
+f_map = np.zeros((2, m))
+for i in range(0, m):
     f_map[:, i] = D_MAP * (2.0 * np.random.rand(2)-1)
 
 #plt.figure(2)
@@ -171,7 +171,7 @@ def h(x, transm):
 
 def pf_resample(x_pf, x_likelihood):
     """Function to resample particles."""
-
+    M = x_pf.shape[1]
     # Initialize a set of output particles
     x_pf_resampled = np.zeros((4, M))
 
@@ -186,7 +186,7 @@ def pf_resample(x_pf, x_likelihood):
 
 def articulated_pf(x_pf, v, y, f_map, Q, R, T):
     """Particle filter for articulated vehicle function."""
-
+    M = x_pf.shape[1]
     # Find the number of transmitters
     m_k = y.shape[0]
 
@@ -248,10 +248,10 @@ x_hat = np.zeros((4, N))
 P_hat = np.zeros((4, 4, N))
 
 # Initialize the initial guess to a location different from the actual location
-x_hat[:, 0] = x[:, 0] + np.array([0, 5.0, 0.1, 0.1])
+x_hat[:, 0] = x[:, 0] + np.array([0, 5.0, 0.5, 0.5])
 
 # Set some initial conditions
-P_hat[:, :, 0] = np.diag(np.square([5.0, 5.0, 3.5, 3.5]))
+P_hat[:, :, 0] = np.diag(np.square([5.0, 5.0, 0.1, 0.1]))
 
 # Set the covariance matrices
 Q = np.diag([SIGMA_SPEED**2, 2*SIGMA_PHI**2/T**2])
@@ -261,7 +261,7 @@ R_MAX = 25.0
 R_MIN = 1.0
 
 # Set the range and bearing covariance
-R = np.eye(M)
+R = np.eye(m)
 R = SIGMA_TRANSM ** 2*R
 #R = np.diag([SIGMA_TRANSM**2])
 
@@ -269,6 +269,11 @@ R = SIGMA_TRANSM ** 2*R
 for i in range(1, M):
     x_pf[:, i, 0] = x_hat[:, 0] + np.sqrt(P_hat[:, :, 0]) @ np.random.standard_normal(4)
 
+u_ = np.zeros((2, N))
+
+for k in range(1, N):
+    # Compute some inputs to steer the unicycle around
+    u_[:,k] = np.array([1.0, np.sin(0.0005 * T * k)])
 # Initialize the first particles on the basis of the initial uncertainty
 # for i in range(1, M):
 #     x_pf[:, i, 0] = 100 * np.random.uniform(-1, 1, 3)
@@ -277,7 +282,7 @@ for i in range(1, M):
 for i in range(1, N):
 
     # Compute some inputs (i.e., drive around)
-    v = np.array([0.1, -0.01])
+    v = v = u_[:, i-1]
 
     # Run the vehicle motion model
     x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
@@ -309,6 +314,7 @@ for i in range(0, N):
     x_hat[0, i] = np.mean(x_pf[0, :, i])
     x_hat[1, i] = np.mean(x_pf[1, :, i])
     x_hat[2, i] = np.mean(x_pf[2, :, i])
+    x_hat[3, i] = np.mean(x_pf[3, :, i])
 
 for i in range(0, N):
     P_hat[:, :, i] = np.cov(x_pf[:, :, i])

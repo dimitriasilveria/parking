@@ -15,7 +15,7 @@ from scipy.stats import chi2
 
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 30.0
-T = 0.04
+T = 0.05
 
 # Create an array of time values [s]
 t = np.arange(0.0, SIM_TIME, T)
@@ -107,10 +107,10 @@ for i in range(1, M):
 # BUILD A MAP OF TRANSMITTERS IN THE VEHICLE'S ENVIRONMENT
 
 # Number of transmitters
-M = 20
+M = 50
 
 # Map size [m]
-D_MAP = 5
+D_MAP = 50
 
 # Randomly place features in the map
 f_map = np.zeros((2, M))
@@ -172,7 +172,7 @@ def h(x, transm):
 
 def pf_resample(x_pf, x_likelihood):
     """Function to resample particles."""
-
+    M = x_pf.shape[1]
     # Initialize a set of output particles
     x_pf_resampled = np.zeros((4, M))
 
@@ -187,7 +187,7 @@ def pf_resample(x_pf, x_likelihood):
 
 def articulated_pf(x_pf, v, y, f_map, Q, R, T):
     """Particle filter for articulated vehicle function."""
-
+    M = x_pf.shape[1]
     # Find the number of transmitters
     m_k = y.shape[0]
 
@@ -274,12 +274,16 @@ for i in range(1, M):
 # Initialize the first particles on the basis of the initial uncertainty
 # for i in range(1, M):
 #     x_pf[:, i, 0] = 100 * np.random.uniform(-1, 1, 3)
+u_ = np.zeros((2, N))
 
+for k in range(1, N):
+    # Compute some inputs to steer the unicycle around
+    u_[:,k] = np.array([1.0, np.sin(0.0005 * T * k)])
 # Simulate for each time
 for i in range(1, N):
 
     # Compute some inputs (i.e., drive around)
-    v = np.array([0.1, -0.01])
+    v = u_[:, i-1]
 
     # Run the vehicle motion model
     x[:, i] = rk_four(vehicle.f, x[:, i - 1], v, T)
