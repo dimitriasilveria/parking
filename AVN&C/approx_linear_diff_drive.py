@@ -15,7 +15,7 @@ from scipy import signal
 
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 15.0
-T = 0.04
+T = 0.01
 
 # Create an array of time values [s]
 t = np.arange(0.0, SIM_TIME, T)
@@ -25,7 +25,7 @@ N = np.size(t)
 # VEHICLE SETUP
 
 # Set the track length of the vehicle [m]
-ELL = 1.0
+ELL = 0.25
 
 # Create a vehicle object of type DiffDrive
 vehicle = DiffDrive(ELL)
@@ -33,22 +33,19 @@ vehicle = DiffDrive(ELL)
 # %%
 # COMPUTE THE REFERENCE TRAJECTORY
 
-# Radius of the circle [m]
-R = 10
-
 # Angular rate [rad/s] at which to traverse the circle
-OMEGA = 0.1
-
+theta = 0.0
+v_d=0.75
+a=4
 # Pre-compute the desired trajectory
 x_d = np.zeros((3, N))
 u_d = np.zeros((2, N))
 for k in range(0, N):
-    x_d[0, k] = R * np.sin(OMEGA * t[k])
-    x_d[1, k] = R * (1 - np.cos(OMEGA * t[k]))
-    x_d[2, k] = OMEGA * t[k]
-    u_d[0, k] = (R -ELL/2) *OMEGA
-    u_d[1, k] = (R +ELL/2) *OMEGA
-
+    x_d[0, k] = v_d*np.cos(theta) * t[k]
+    x_d[1, k] = v_d*np.sin(theta)*t[k] + a#m*(x_d[0,k])
+    x_d[2, k] = theta
+    u_d[0, k] = v_d
+    u_d[1, k] = v_d
 
 # %%
 # SIMULATE THE CLOSED-LOOP SYSTEM
@@ -56,8 +53,8 @@ for k in range(0, N):
 # Initial conditions
 x_init = np.zeros(3)
 x_init[0] = 0.0
-x_init[1] = 5.0
-x_init[2] = 0.0
+x_init[1] = -1.0
+x_init[2] = -0.1
 
 # Setup some arrays
 x = np.zeros((3, N))
@@ -81,12 +78,11 @@ for k in range(1, N):
     B = np.array([[0.5*np.cos(x_d[2, k - 1]), 0.5*np.cos(x_d[2, k - 1])], [0.5*np.sin(x_d[2, k - 1]), 0.5*np.sin(x_d[2, k - 1])], [-1/ELL, 1/ELL]])
 
     # Compute the gain matrix to place poles of (A-BK) at p
-    p = np.array([-1.0, -2.0, -0.5])
+    p = np.array([-2.0, -1.0, -0.5])
     K = signal.place_poles(A, B, p)
 
     # Compute the controls (v, omega) and convert to wheel speeds (v_L, v_R)
     u[:, k] = -K.gain_matrix @ (x[:, k - 1] - x_d[:, k - 1]) + u_d[:, k - 1]
-
     #u[:, k] = vehicle.uni2diff(u_unicycle)
 
 # %%
