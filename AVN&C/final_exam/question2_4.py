@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from mobotpy.models import DiffDrive
 from mobotpy.integration import rk_four
 from scipy import signal
-
+from icecream import ic
 # Set the simulation time [s] and the sample period [s]
 SIM_TIME = 15.0
 T = 0.01
@@ -76,7 +76,10 @@ for k in range(1, N):
         ]
     )
     B = np.array([[0.5*np.cos(x_d[2, k - 1]), 0.5*np.cos(x_d[2, k - 1])], [0.5*np.sin(x_d[2, k - 1]), 0.5*np.sin(x_d[2, k - 1])], [-1/ELL, 1/ELL]])
-
+    O = np.concatenate(([B,(A@B),(A@A@B)]),axis=1)
+    rank = np.linalg.matrix_rank(O)
+    if rank != 3:
+        ic(rank)
     # Compute the gain matrix to place poles of (A-BK) at p
     p = np.array([-2.0, -1.0, -0.5])
     K = signal.place_poles(A, B, p)
@@ -92,36 +95,38 @@ for k in range(1, N):
 # Plot the states as a function of time
 fig1 = plt.figure(1)
 fig1.set_figheight(6.4)
-ax1a = plt.subplot(411)
-plt.plot(t, x_d[0, :], "C1--")
-plt.plot(t, x[0, :], "C0")
+# ax1a = plt.subplot(311)
+# plt.plot(t, x_d[0, :], "C1--")
+# plt.plot(t, x[0, :], "C0")
+# plt.grid(color="0.95")
+# plt.ylabel(r"$x$ [m]")
+#plt.setp(ax1a, xticklabels=[])
+#plt.legend(["Desired", "Actual"])
+ax1b = plt.subplot(211)
+
+plt.plot(t, x_d[1, :] -x_d[1, :] , "C1--",label="Desired")
+plt.plot(t, x[1, :]-x_d[1, :], "C0",label="Actual")
 plt.grid(color="0.95")
-plt.ylabel(r"$x$ [m]")
-plt.setp(ax1a, xticklabels=[])
-plt.legend(["Desired", "Actual"])
-ax1b = plt.subplot(412)
-plt.plot(t, x_d[1, :], "C1--")
-plt.plot(t, x[1, :], "C0")
-plt.grid(color="0.95")
-plt.ylabel(r"$y$ [m]")
+plt.ylabel(r"$e_l$ [m]")
 plt.setp(ax1b, xticklabels=[])
-ax1c = plt.subplot(413)
-plt.plot(t, x_d[2, :] * 180.0 / np.pi, "C1--")
-plt.plot(t, x[2, :] * 180.0 / np.pi, "C0")
+plt.legend(["Desired", "Actual"])
+ax1c = plt.subplot(212)
+plt.plot(t, (x_d[2, :] - x_d[2, :]) * 180.0 / np.pi, "C1--",label="Desired")
+plt.plot(t, x[2, :] - x_d[2, :] * 180.0 / np.pi, "C0",label="Actual")
 plt.grid(color="0.95")
-plt.ylabel(r"$\theta$ [deg]")
+plt.ylabel(r"$e_h$ [deg]")
 plt.setp(ax1c, xticklabels=[])
-ax1d = plt.subplot(414)
-plt.step(t, u[0, :], "C2", where="post", label="$v_L$")
-plt.step(t, u[1, :], "C3", where="post", label="$v_R$")
-plt.grid(color="0.95")
-plt.ylabel(r"$\bm{u}$ [m/s]")
-plt.xlabel(r"$t$ [s]")
-plt.legend()
+# ax1d = plt.subplot(313)
+# plt.step(t, u[0, :], "C2", where="post", label="$v_L$")
+# plt.step(t, u[1, :], "C3", where="post", label="$v_R$")
+# plt.grid(color="0.95")
+# plt.ylabel(r"$\bm{u}$ [m/s]")
+# plt.xlabel(r"$t$ [s]")
+# plt.legend()
 
 # Save the plot
 #plt.savefig("../agv-book/figs/ch4/control_approx_linearization_fig1.pdf")
-
+plt.show()
 # Plot the position of the vehicle in the plane
 fig2 = plt.figure(2)
 plt.plot(x_d[0, :], x_d[1, :], "C1--", label="Desired")

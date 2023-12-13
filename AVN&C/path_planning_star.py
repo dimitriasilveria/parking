@@ -20,24 +20,28 @@ class Path_Generator():
         self.v = 5
         self.W = 1
         self.obstacles = []
-    def cost(self,x_new,x_last):
-        step = 0.05
+    def best(self,x_new,x_nearest):
+        d = 2
+        gamma = 2
         c_min = 100000
-        m = (x_last[1]-x_new[1])/(x_last[0]-x_new[0])
-        x_better = x_new[0]
-        y_better = x_new[1]
-        for i in np.arange(0,1,step):
-            alpha = 2*math.pi*i
-            x = self.radius*0.5 * math.cos(alpha) + x_new[0]
-            y = self.radius*0.5 * math.sin(alpha) + x_new[1]
-            c = self.dist([x,y],self.q_init) + self.dist([x,y],self.q_target) + (m**2)
-            if c < c_min:
-                c_min = c
-                x_better = x
-                y_better = y 
+        n_best = -1
+        n = len(self.G.nodes)
+        r = gamma*((np.log(n+1))/(n+1))**(1/d)
+        for node in self.G.nodes:
+            x_node = [self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1]]
+            d_node = self.dist(x_node,x_new)
+            m = (x_node[1]-x_new[1])/(x_node[0]-x_new[0])
+            #print('d',d,node)
+            #print('x new',x_new,self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1])
+            if d <= r and d >0.01:
+                cost = self.G.nodes[node]['cost'] + d_node + abs(m)
+                if cost < c_min:
+                    c_min = cost
+                #print(self.G.nodes[node]['q'])
+                    n_best = node
 
-        return [x_better,y_better]
-    
+        return n_best
+
     def random_points_box(self, center):
         # radius of the circle
 
@@ -51,6 +55,7 @@ class Path_Generator():
         x = x0 + random.random()*(x1-x0) -0.1
         y = y0 + random.random() *(y1-y0) + 0.1
         return [x,y]
+
     def solve(self, bl, tr, p) :
         if (p[0] > bl[0] and p[0] < tr[0] and p[1] > bl[1] and p[1] < tr[1]) :
             return True
@@ -89,6 +94,7 @@ class Path_Generator():
         y0 = self.q_init[1]
         y1 = obs_1[1][1] + 0.1
 
+
         if (p[0] < x0 or p[0] > x1 or p[1] < y0 or p[1] > y1) :
             return True
         else :
@@ -102,14 +108,11 @@ class Path_Generator():
         for node in self.G.nodes:
 
             d = self.dist([self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1]],x_new)
-            #print('d',d,node)
-            #print('x new',x_new,self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1])
+
             if d <= d_min:
                 d_min = d
-                
-                #print(self.G.nodes[node]['q'])
                 n_min = node
-        #print('min',d_min,n_min)
+
         if d_min < 0.01:
             return -1
         else:
@@ -132,24 +135,26 @@ class Path_Generator():
         Y = []
         Psi = []
         Phi = []
-        m = np.arctan2(xf[1]-y,xf[0]-x)
+
         #h = 0.01
         t = 0
+        cost = 0
+        t_max = 0.75*random.randint(1,3)
         while (abs(x - xf[0]) > tol or abs(y-xf[1])> tol ) and t<0.5: #and self.obstacle([x,y]) == False:
             #print(i)
             m = np.arctan2(xf[1]-y,xf[0]-x)
-
+            
             phi = m-psi #front parking
             if phi < -0.6:
                 phi = -0.6
             elif phi > 0.6:
                phi = 0.6
-
+            cost += np.sqrt(v*dt*np.cos(psi)**2+v*dt*np.sin(psi)**2)
             x= x + v*dt*np.cos(psi)#*np.cos(phi)
             y = y +v*dt*np.sin(psi)#*np.cos(phi)
             psi = psi + v*dt*np.tan(phi)/self.L
             if self.obstacle([x,y]) or self.outside_box([x,y]) == True:
-                return [],[],[],[]
+                return [],[],[],[],[]
             #print('x,y',x,y)
             X.append(x)
             Y.append(y)
@@ -157,7 +162,7 @@ class Path_Generator():
             Phi.append(phi)
             #i = i +1
             t = t+dt
-        return X, Y, Psi,Phi
+        return X, Y, Psi,Phi,cost
     
     def path_smoothing(self,G_path):
         X = []
@@ -198,8 +203,8 @@ class Path_Generator():
                 (0, {'qx':[self.q_init[0]],
                      'qy': [self.q_init[1]],
                     'qpsi':[self.q_init[2]],
-                     'qphi': [self.q_init[3]]})#,
-                     #'cost' : 0 })
+                     'qphi': [self.q_init[3]],
+                     'cost' : 0 })
             ])
 
             #print(list(self.G.nodes[0]['q']))
@@ -208,65 +213,79 @@ class Path_Generator():
             Phi = [self.q_init[3]]
             radius = 4
             self.first = True
-            i = 1
+
             plt.clf()
+            # obs_1 = self.obstacles[0]
+            # x0 = obs_1[0][0]# - 0.25
+            # x1 = self.q_init[0] 
+            # y0 = self.q_init[1]
+            # y1 = obs_1[1][1] + 0.1
+            # print('0',x0,y0,'1',x1,y1)
+            # print(self.q_target)
+            # x,y = self.box([x0,y0],[x1,y1])
+            # plt.plot(x,y)
+            plt.scatter(q_init[0],q_init[1],100)
+            plt.scatter(q_target[0],q_target[1],100)
             for obstacle in self.obstacles:
                 x,y=self.box(obstacle[0],obstacle[1])
                 plt.plot(x,y)
-            plt.scatter(q_init[0],q_init[1],100)
-            plt.scatter(q_target[0],q_target[1],100)
-            for _ in range(30):
+            i=1
+            while i <40:
+                
                 print(i)
-                x_rand = self.random_points_box(x_last)               
-                x_new = x_rand #self.cost(x_rand,x_last)
-                #print(x_new,'x_new')
+                x_new = self.random_points_box(x_last)               
+                                #print(x_new,'x_new')
                 #print(self.obstacle(self.q_target,x_new))
-                if self.obstacle(x_new) == False and self.outside_box(x_new) == False:
+                if self.obstacle(x_new) != False and self.outside_box(x_new) != False:
+                    continue
+                nearest = self.search_nearest(x_new)
+                if nearest == -1:
+                    continue
+                x_nearest = [self.G.nodes[nearest]['qx'][-1],
+                                self.G.nodes[nearest]['qy'][-1]]#,self.G.nodes[nearest]['cost']]
+                best = self.best(x_new,x_nearest)
+                if best == -1:
+                    best = nearest
+                x_best = [self.G.nodes[best]['qx'][-1],
+                                self.G.nodes[best]['qy'][-1],self.G.nodes[best]['qpsi'][-1],self.G.nodes[best]['qphi'][-1]]
+                X_new, Y_new, Psi,Phi,cost = self.kinematics(dt,x_best[0:2],x_new,x_best[2],x_best[3],self.v)
+                #print(Phi[-1],'phi')
+                if any(X_new) != True:
+                    continue
+                x_last = [X_new[-1],Y_new[-1],Psi[-1]]
+                
+                self.G.add_nodes_from([
+                (i, {'qx':X_new,
+                        'qy': Y_new,
+                        'qpsi': Psi,
+                        'qphi': Phi,
+                        'cost': cost})
+                ])
+                
+                self.G.add_edge(best,i)
+                pos = {node: [self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1]] for node in self.G.nodes}
+                i+=1
+                # options = {
+                #     "font_size": 20,
+                #     "node_size": 500,
+                #     "node_color": "white",
+                #     "edgecolors": "black",
+                #     "linewidths": 5,
+                #     "width": 5,
+                # }
 
-                    nearest = self.search_nearest(x_rand)
-                    if nearest == -1:
-                        continue
-                    x_nearest = [self.G.nodes[nearest]['qx'][-1],
-                                 self.G.nodes[nearest]['qy'][-1],self.G.nodes[nearest]['qpsi'][-1],self.G.nodes[nearest]['qphi'][-1]]#,self.G.nodes[nearest]['cost']]
-                    x_best = self.cost(x_rand,x_nearest)
-                    X_new, Y_new, Psi,Phi = self.kinematics(dt,x_nearest[0:2],x_new,x_nearest[2],x_nearest[3],self.v)
-                    #print(Phi[-1],'phi')
-                    if any(X_new) == True:
-    
-                        x_last = [X_new[-1],Y_new[-1],Psi[-1]]
-                        
-                        self.G.add_nodes_from([
-                        (i, {'qx':X_new,
-                                'qy': Y_new,
-                                'qpsi': Psi,
-                                'qphi': Phi})
-                        ])
+                #plt.plot(x_box,y_box)
+                nx.draw_networkx(self.G, pos)
+                #nx.draw(self.G)
+                plt.draw()
+                plt.pause(0.01) 
+                self.first = False
 
-                        self.G.add_edge(nearest,i)
-                        pos = {node: [self.G.nodes[node]['qx'][-1],self.G.nodes[node]['qy'][-1]] for node in self.G.nodes}
-
-                        # options = {
-                        #     "font_size": 20,
-                        #     "node_size": 500,
-                        #     "node_color": "white",
-                        #     "edgecolors": "black",
-                        #     "linewidths": 5,
-                        #     "width": 5,
-                        # }
-
-                        #plt.plot(x_box,y_box)
-                        nx.draw_networkx(self.G, pos)
-                        #nx.draw(self.G)
-                        #plt.draw()
-                        plt.pause(0.01) 
-                        self.first = False
-                        i +=1
-                        if abs(x_last[0] -self.q_target[0])  <= self.target_tol  and abs(x_last[1] -self.q_target[1])  <= self.target_tol and abs(x_last[2] -self.q_target[2])  <= 3*self.target_tol:
-                            print(i)
-                            break
+                if abs(x_last[0] -self.q_target[0])  <= self.target_tol  and abs(x_last[1] -self.q_target[1])  <= self.target_tol:# and abs(x_last[2] -self.q_target[2])  <= 2*self.target_tol:
+                    print(i)
+                    break
                     #return self.G
-            print('diff',x_last[2])
-            if abs(x_last[0] -self.q_target[0])  <= self.target_tol  and abs(x_last[1] -self.q_target[1])  <= self.target_tol and abs(x_last[2] -self.q_target[2])  <= 3*self.target_tol:
+            if abs(x_last[0] -self.q_target[0])  <= self.target_tol  and abs(x_last[1] -self.q_target[1])  <= self.target_tol:# and abs(x_last[2] -self.q_target[2])  <= 2*self.target_tol:
                 #print(x_new,'x_new')
 
                 break
@@ -336,6 +355,8 @@ if __name__ == '__main__':
     #path_gen.set_obstacles(obs_3)
     q_init = np.array([0.2,obs_2[0][1]-0.35,np.pi/2,0])
     q_target = np.array([(obs_1[0][0]+obs_1[1][0])/2,(obs_1[0][1]+obs_2[1][1])/2,np.pi/2,0])
+    #angles_i = np.array([]) #psi, phi
+    #angles_f = np.array([])
     X1,Y1, Psi1, Phi1 = path_gen.generate_path(q_init,q_target,50,v=0.11,w=W)
    
     # options = {
