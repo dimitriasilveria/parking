@@ -231,7 +231,6 @@ class Path_Generator():
             x_last = self.q_init[0:2]
             Psi = [self.q_init[2]]
             Phi = [self.q_init[3]]
-            radius = 4
             self.first = True
             i = 1
             while 1:
